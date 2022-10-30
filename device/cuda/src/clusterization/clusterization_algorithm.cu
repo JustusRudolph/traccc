@@ -30,11 +30,21 @@
 namespace traccc::cuda {
 namespace kernels {
 
+__device__ void print_grid_info() {
+    //printf("Grid dim:   (%d, %d, %d)\n", gridDim.x, gridDim.y, gridDim.z);
+    // printf("Block idx:  (%d, %d, %d)\n", blockIdx.x, blockIdx.y, blockIdx.z);
+    //printf("Block dim:  (%d, %d, %d)\n", blockDim.x, blockDim.y, blockDim.z);
+    // printf("Thread Idx: (%d, %d, %d)\n", threadIdx.x, threadIdx.y, threadIdx.z);
+    printf("(Block, Thread) idx in x:  (%d, %d)\n", blockIdx.x, threadIdx.x);
+
+}
+
 __global__ void find_clusters(
     const cell_container_types::const_view cells_view,
     vecmem::data::jagged_vector_view<unsigned int> sparse_ccl_indices_view,
     vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
 
+    print_grid_info();
     device::find_clusters(threadIdx.x + blockIdx.x * blockDim.x, cells_view,
                           sparse_ccl_indices_view, clusters_per_module_view);
 }
@@ -104,8 +114,11 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     // Vecmem copy object for moving the data between host and device
     vecmem::copy copy;
 
+    printf("Starting CUDA clusterization.\n");
+    //print_grid_info();
     // Number of modules
     unsigned int num_modules = cells_per_event.size();
+    printf("Number of modules: %d\n", num_modules);
 
     // Work block size for kernel execution
     std::size_t threadsPerBlock = 64;
@@ -117,6 +130,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     // Get the sizes of the cells in each module
     auto cell_sizes = copy.get_sizes(cells_data.items);
 
+    printf("Size of cell 0: %d\n\n", (int) cell_sizes[0]);
     /*
      * Helper container for sparse CCL calculations.
      * Each inner vector corresponds to 1 module.

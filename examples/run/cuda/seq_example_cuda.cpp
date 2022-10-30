@@ -132,6 +132,8 @@ int seq_run(const traccc::full_tracking_input_config& i_cfg,
 
         auto spacepoints_cuda_buffer = ca_cuda(cells_per_event_cuda);
 
+        //std::cout << "Cells_per_event_cuda[0] = " << cells_per_event_cuda[0] << std::endl;
+
         /*time*/ auto end_cluterization_cuda = std::chrono::system_clock::now();
         /*time*/ std::chrono::duration<double> time_clusterization_cuda =
             end_cluterization_cuda - start_cluterization_cuda;
