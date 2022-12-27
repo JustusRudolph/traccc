@@ -23,6 +23,7 @@
 
 // System include(s).
 #include <algorithm>
+#include <string>
 
 // Local include(s)
 #include "traccc/cuda/utils/definitions.hpp"
@@ -44,9 +45,64 @@ __global__ void find_clusters(
     vecmem::data::jagged_vector_view<unsigned int> sparse_ccl_indices_view,
     vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
 
-    print_grid_info();
+    //print_grid_info();
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    cell_container_types::const_device cells_device(cells_view);
+    vecmem::jagged_device_vector<unsigned int> device_sparse_ccl_indices(
+        sparse_ccl_indices_view);
+    vecmem::device_vector<std::size_t> device_clusters_per_module(
+        clusters_per_module_view);
+
+    bool check_all = false;
+    // pick the below module because it has many activated cells
+    int module_to_check = 755;  // module number that is being probed if above false
+
+    // if all modules are to be checked, then check if index is in range
+    // otherwise, check only if index is right
+    bool check = (check_all && (idx < cells_device.size())) || (idx == module_to_check);
+    
+    if (check) {
+        // first print the cells for this module
+        const vecmem::device_vector<const traccc::cell>& cells =
+            cells_device.at(idx).items;
+        size_t n_cells = cells.size();
+
+        for (int i=0; i < n_cells; i++) {
+            const traccc::cell cell = cells[i];
+            scalar act = cell.activation;
+            printf("Idx: %d, i.e. (%d, %d): Cell index %d and position: (%d, %d) activation: %f\n",
+                    idx, blockIdx.x, threadIdx.x, i, cell.channel0, cell.channel1, act);
+
+        }
+        // then print the inputs/outputs that go into the actual algorithm
+
+        // THE BELOW IS COMMENTED BECAUSE IT'S NOT REALLY NECESSARY, ALL CELLS ARE ALLOCATED
+        // TO CLUSTER NUMBER 0 AT INITIALISATION
+
+        // unsigned int n_sparse_ccl_indices = device_sparse_ccl_indices.at(idx).size();
+        // for (int i=0; i < n_sparse_ccl_indices; i++) {
+        //     unsigned int cell_cluster_number = device_sparse_ccl_indices.at(idx).at(i);
+        //     printf("Before: Idx: %d, Clusters in module: %d, Cell %d belongs to cluster %d\n",
+        //         idx, (int) device_clusters_per_module.at(idx), i, cell_cluster_number);
+        // }
+
+        printf("Before: Idx: %d, Clusters in module: %d. All cells are in cluster 0.\n",
+            idx, (int) device_clusters_per_module.at(idx));
+    }
+    
+
     device::find_clusters(threadIdx.x + blockIdx.x * blockDim.x, cells_view,
                           sparse_ccl_indices_view, clusters_per_module_view);
+
+    if (check) {
+        unsigned int n_sparse_ccl_indices = device_sparse_ccl_indices.at(idx).size();
+        // print outputs from clusterisation algo
+        for (int i=0; i < n_sparse_ccl_indices; i++) {
+            unsigned int cell_cluster_number = device_sparse_ccl_indices.at(idx).at(i);
+            printf("After: Idx: %d, Clusters in module: %d, Cell %d belongs to cluster %d\n",
+                idx, (int) device_clusters_per_module.at(idx), i, cell_cluster_number);
+        }
+    }
 }
 
 __global__ void count_cluster_cells(
@@ -115,7 +171,6 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     vecmem::copy copy;
 
     printf("Starting CUDA clusterization.\n");
-    //print_grid_info();
     // Number of modules
     unsigned int num_modules = cells_per_event.size();
     printf("Number of modules: %d\n", num_modules);
@@ -130,7 +185,6 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     // Get the sizes of the cells in each module
     auto cell_sizes = copy.get_sizes(cells_data.items);
 
-    printf("Size of cell 0: %d\n\n", (int) cell_sizes[0]);
     /*
      * Helper container for sparse CCL calculations.
      * Each inner vector corresponds to 1 module.
