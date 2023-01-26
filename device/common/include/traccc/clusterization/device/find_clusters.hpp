@@ -9,6 +9,7 @@
 
 // Project include(s).
 #include "traccc/clusterization/detail/sparse_ccl.hpp"
+#include "traccc/clusterization/detail/hoshen_kopelman.hpp"
 #include "traccc/definitions/qualifiers.hpp"
 #include "traccc/edm/cell.hpp"
 

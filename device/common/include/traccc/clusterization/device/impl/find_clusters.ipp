@@ -31,7 +31,8 @@ void find_clusters(
     auto cluster_indices = device_sparse_ccl_indices[globalIndex];
 
     // Run the sparse CCL algorithm
-    unsigned int n_clusters = detail::sparse_ccl(cells, cluster_indices);
+    // unsigned int n_clusters = detail::sparse_ccl(cells, cluster_indices);
+    unsigned int n_clusters = detail::hoshen_kopelman(globalIndex, cells, cluster_indices);
 
     // Fill the "number of clusters per
     // module" vector
