@@ -111,6 +111,15 @@ int seq_run(const traccc::full_tracking_input_config& i_cfg,
                 common_opts.input_data_format, surface_transforms, digi_cfg,
                 host_mr);
         }
+        // just check for 755, that's already 913 cells
+        // unsigned int k_cells = cells_per_event[755].items.size();
+
+        // for (unsigned int i = 0; i < k_cells; i++) {
+        //     auto cell = cells_per_event[755].items[i];
+        //     int x = cell.channel0;
+        //     int y = cell.channel1;
+        //     std::cout << "(" << x << "," << y << ")" << std::endl;
+        // }
 
         // Read the cells from the relevant event file for CUDA algorithm
         traccc::cell_container_types::host cells_per_event_cuda =
@@ -127,6 +136,23 @@ int seq_run(const traccc::full_tracking_input_config& i_cfg,
         /*-----------------------------
               Clusterization and Spacepoint Creation (cuda)
           -----------------------------*/
+        // unsigned int k_modules = cells_per_event.size();
+        // for (unsigned int j = 0; j < k_modules; j++){
+        //     auto module_cells = &cells_per_event[j].items;
+        //     std::sort(module_cells->begin(), module_cells->end(),
+        //         [](auto a, auto b)
+        //             {
+        //                 return a.channel1 > b.channel1;
+        //             });
+        // }
+        // std::cout << "AFTER SORTING" << std::endl;
+        // for (unsigned int i = 0; i < k_cells; i++) {
+        //     auto cell = cells_per_event[755].items[i];
+        //     int x = cell.channel0;
+        //     int y = cell.channel1;
+        //     std::cout << "(" << x << "," << y << ")" << std::endl;
+        // }
+
         /*time*/ auto start_cluterization_cuda =
             std::chrono::system_clock::now();
 
