@@ -120,7 +120,9 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
                                                        const cell_container_t& cells,
                                                        label_vector& labels) {
     // first specify if we want to print debug messages throughout
-    bool print_debug = false; //globalIndex == 2409;                                                    
+    bool print_debug = false; //globalIndex == 2409;   
+    bool include_diagonals = true;  // change this to get graph for output
+                                    // where HK only takes nns into account                                                  
     // The number of cells.
     const unsigned int n_cells = cells.size();
 
@@ -188,7 +190,7 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
                 }
             }
         }
-        else if (diagonal_above_label > 0) {
+        else if (diagonal_above_label > 0 && include_diagonals) {
             // in case nothing next to, check the diagonals
             for (unsigned int j = 0; j < n_cells; j++) {
                 // overwrite all cells with current label to the one diagonally above
