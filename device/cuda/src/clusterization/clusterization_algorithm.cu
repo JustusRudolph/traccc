@@ -32,7 +32,7 @@ namespace traccc::cuda {
 namespace kernels {
 
 
-__global__ void find_clusters_ind(
+__global__ void find_clusters_cell_parallel(
     const cell_container_types::const_view cells_view,
     vecmem::data::jagged_vector_view<unsigned int> sparse_ccl_indices_view,
     vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
@@ -198,6 +198,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     auto cells_data =
         get_data(cells_per_event, (m_mr.host ? m_mr.host : &(m_mr.main)));
 
+    //int test = (int) cells_data;
     // auto *headers = &cells_data.headers;
     // auto *cells = vecmem::get_data(&cells_data.items);
     // for (unsigned int j = 0; j < num_modules; j++){
@@ -211,7 +212,26 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
     // Get the sizes of the cells in each module
     auto cell_sizes = copy.get_sizes(cells_data.items);
+    unsigned int n_cells_total = 0;
+    for (unsigned int i = 0; i < cell_sizes.size(); i++) {
+        n_cells_total += cell_sizes[i];
+    }
+    // create a vector which maps the cell index to current module
+    vecmem::vector<std::size_t> cell_module(n_cells_total);
+    unsigned int curr_idx = 0;  // used to populate the above
+    for (std::size_t i = 0; i < cell_sizes.size(); i++) {
+        for (std::size_t j = 0; j < cell_sizes[i]; j++) {
+            cell_module[curr_idx] = i;  // i is the module, j the cell
+            curr_idx++;
+        }
+    }
+    // instantiate vector buffer to hold the above data
+    vecmem::data::vector_buffer<std::size_t> cell_module_buff(
+        n_cells_total, m_mr.main);
+    m_copy->setup(cell_module_buff);
 
+    (*m_copy)(vecmem::get_data(cell_module), cell_module_buff,
+        vecmem::copy::type::copy_type::host_to_device);
     /*
      * Helper container for sparse CCL calculations.
      * Each inner vector corresponds to 1 module.
