@@ -34,13 +34,19 @@ namespace kernels {
 
 __global__ void find_clusters_cell_parallel(
     const cell_container_types::const_view cells_view,
-    vecmem::data::jagged_vector_view<unsigned int> sparse_ccl_indices_view,
+    vecmem::data::vector_view<std::size_t> cell_to_module_view,
+    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
     vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
         /*
         this function is the same as find_clusters but instead of every module
-        being a thread, every cell is a thread instead
+        being a thread, every cell is a thread instead. Thus, it has an
+        extra argument which makes it possible to map the current cell (idx) to
+        the module it belongs to.
         */
-       unsigned int module_number = 0;  // temp
+        cell_idx = threadIdx.x + blockIdx.x * blockDim.x;
+
+        device::find_clusters(cell_idx, cells_view, cell_to_module_view,
+                              cell_cluster_label_view, clusters_per_module_view)
     }
 
 __global__ void find_clusters(
@@ -229,7 +235,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     vecmem::data::vector_buffer<std::size_t> cell_module_buff(
         n_cells_total, m_mr.main);
     m_copy->setup(cell_module_buff);
-
+    // move the cell_module vector to the device
     (*m_copy)(vecmem::get_data(cell_module), cell_module_buff,
         vecmem::copy::type::copy_type::host_to_device);
     /*
