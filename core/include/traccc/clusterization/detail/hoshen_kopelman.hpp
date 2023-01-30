@@ -265,9 +265,10 @@ template <typename cell_container_t, typename label_vector>
 TRACCC_HOST_DEVICE
 inline unsigned int hoshen_kopelman(std::size_t globalIndex, 
                                     const cell_container_t& cells,
-                                    const traccc::cell cell;
+                                    const traccc::cell cell,
                                     label_vector& labels) {
-    return 0
+    
+    return 0;
 }                                                        
 
 }  // namespace detail
