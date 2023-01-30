@@ -73,7 +73,7 @@ void find_clusters(
     // Get the cells for the current module and the cell this thread
     // is looking at
     const auto& cells = cells_device.at(module_number).items;
-    const traccc::cell = cells[cell_index];
+    const traccc::cell cell = cells[cell_index];
     // Get the relevant labels, so the ones for this current module
     auto cluster_labels = device_cell_cluster_labels[module_number];
 

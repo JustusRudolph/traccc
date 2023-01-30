@@ -32,55 +32,55 @@ namespace traccc::cuda {
 namespace kernels {
 
 
-__global__ void setup_cluster_labels(
-    vecmem::data::vector_view<std::size_t> cell_to_module_view,
-    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view) {
-        /*
-         * This function sets up labels for every cell. Before running
-         * Hoshen-Kopelman, each vector in the jagged vector cell_cluster_label_view
-         * (which corresponds to one module each), is changed from being all
-         * zeros to an array from 1 to N, where N is the number of cells in
-         * the given module that are activated. Note that because we are dealing
-         * with an inconsistent device vector, we just launch K threads, where K
-         * is the total number of cells. This is in place of doing a N threads
-         * for each module, the (module, cell) number being represented by (x,y)
-         * in the threadIdx.
-         */
-        // get global index
-        global_idx = threadIdx.x + blockIdx.x * blockDim.x;
-        // make relevant device vectors
-        vecmem::device_vector<std::size_t> device_cell_to_module(
-            cell_to_module_view);
-        vecmem::device_vector<std::size_t> device_cell_indices_in_mod(
-            cell_indices_in_mod_view);
-        vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
-            cell_cluster_label_view);
+// __global__ void setup_cluster_labels(
+//     vecmem::data::vector_view<std::size_t> cell_to_module_view,
+//     vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
+//     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view) {
+//         /*
+//          * This function sets up labels for every cell. Before running
+//          * Hoshen-Kopelman, each vector in the jagged vector cell_cluster_label_view
+//          * (which corresponds to one module each), is changed from being all
+//          * zeros to an array from 1 to N, where N is the number of cells in
+//          * the given module that are activated. Note that because we are dealing
+//          * with an inconsistent device vector, we just launch K threads, where K
+//          * is the total number of cells. This is in place of doing a N threads
+//          * for each module, the (module, cell) number being represented by (x,y)
+//          * in the threadIdx.
+//          */
+//         // get global index
+//         global_idx = threadIdx.x + blockIdx.x * blockDim.x;
+//         // make relevant device vectors
+//         vecmem::device_vector<std::size_t> device_cell_to_module(
+//             cell_to_module_view);
+//         vecmem::device_vector<std::size_t> device_cell_indices_in_mod(
+//             cell_indices_in_mod_view);
+//         vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
+//             cell_cluster_label_view);
 
-        module_number = device_cell_to_module[global_idx];
-        cell_index = device_cell_indices_in_mod[global_idx];
-        // set the label to the index + 1, since labels are 1...N, not 0 indexed
-        device_cell_cluster_labels[module_number][cell_index] = cell_index+1;
-    }
+//         module_number = device_cell_to_module[global_idx];
+//         cell_index = device_cell_indices_in_mod[global_idx];
+//         // set the label to the index + 1, since labels are 1...N, not 0 indexed
+//         device_cell_cluster_labels[module_number][cell_index] = cell_index+1;
+//     }
 
-__global__ void find_clusters_cell_parallel(
-    const cell_container_types::const_view cells_view,
-    vecmem::data::vector_view<std::size_t> cell_to_module_view,
-    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
-    vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
-        /*
-        this function is the same as find_clusters but instead of every module
-        being a thread, every cell is a thread instead. Thus, it has an
-        extra argument which makes it possible to map the current cell (idx) to
-        the module it belongs to.
-        */
-        cell_idx = threadIdx.x + blockIdx.x * blockDim.x;
+// __global__ void find_clusters_cell_parallel(
+//     const cell_container_types::const_view cells_view,
+//     vecmem::data::vector_view<std::size_t> cell_to_module_view,
+//     vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
+//     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
+//     vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
+//         /*
+//         this function is the same as find_clusters but instead of every module
+//         being a thread, every cell is a thread instead. Thus, it has an
+//         extra argument which makes it possible to map the current cell (idx) to
+//         the module it belongs to.
+//         */
+//         cell_idx = threadIdx.x + blockIdx.x * blockDim.x;
 
-        device::find_clusters(cell_idx, cells_view, cell_to_module_view,
-                              cell_indices_in_mod_view, cell_cluster_label_view,
-                              clusters_per_module_view)
-    }
+//         device::find_clusters(cell_idx, cells_view, cell_to_module_view,
+//                               cell_indices_in_mod_view, cell_cluster_label_view,
+//                               clusters_per_module_view);
+//     }
 
 __global__ void find_clusters(
     const cell_container_types::const_view cells_view,
@@ -251,42 +251,42 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
     // Get the sizes of the cells in each module
     auto cell_sizes = copy.get_sizes(cells_data.items);
-    unsigned int n_cells_total = 0;
-    for (unsigned int i = 0; i < cell_sizes.size(); i++) {
-        n_cells_total += cell_sizes[i];
-    }
-    // create a vector which maps the cell index to current module
-    vecmem::vector<std::size_t> cell_to_module(n_cells_total);
-    vecmem::vector<std::size_t> cell_indices_in_module(n_cells_total);
-    unsigned int curr_idx = 0;  // used to populate the above
-    for (std::size_t i = 0; i < cell_sizes.size(); i++) {
-        for (std::size_t j = 0; j < cell_sizes[i]; j++) {
-            cell_to_module[curr_idx] = i;  // i is the module number
-            // j is the cell number in the module
-            cell_indices_in_module[curr_idx] = j;
-            curr_idx++;
-        }
-    }
-    // instantiate vector buffers to hold the above data
-    vecmem::data::vector_buffer<std::size_t> cell_to_module_buff(
-        n_cells_total, m_mr.main);
-    m_copy->setup(cell_to_module_buff);
+    // unsigned int n_cells_total = 0;
+    // for (unsigned int i = 0; i < cell_sizes.size(); i++) {
+    //     n_cells_total += cell_sizes[i];
+    // }
+    // // create a vector which maps the cell index to current module
+    // vecmem::vector<std::size_t> cell_to_module(n_cells_total);
+    // vecmem::vector<std::size_t> cell_indices_in_module(n_cells_total);
+    // unsigned int curr_idx = 0;  // used to populate the above
+    // for (std::size_t i = 0; i < cell_sizes.size(); i++) {
+    //     for (std::size_t j = 0; j < cell_sizes[i]; j++) {
+    //         cell_to_module[curr_idx] = i;  // i is the module number
+    //         // j is the cell number in the module
+    //         cell_indices_in_module[curr_idx] = j;
+    //         curr_idx++;
+    //     }
+    // }
+    // // instantiate vector buffers to hold the above data
+    // vecmem::data::vector_buffer<std::size_t> cell_to_module_buff(
+    //     n_cells_total, m_mr.main);
+    // m_copy->setup(cell_to_module_buff);
     
-    vecmem::data::vector_buffer<std::size_t> cell_indices_in_mod_buff(
-        n_cells_total, m_mr.main);
-    m_copy->setup(cell_indices_in_mod_buff);
+    // vecmem::data::vector_buffer<std::size_t> cell_indices_in_mod_buff(
+    //     n_cells_total, m_mr.main);
+    // m_copy->setup(cell_indices_in_mod_buff);
     
-    // move the vectors to the device and create vector views
-    (*m_copy)(vecmem::get_data(cell_to_module), cell_to_module_buff,
-        vecmem::copy::type::copy_type::host_to_device);
-    (*m_copy)(vecmem::get_data(cell_indices_in_module), cell_indices_in_mod_buff,
-        vecmem::copy::type::copy_type::host_to_device);
+    // // move the vectors to the device and create vector views
+    // (*m_copy)(vecmem::get_data(cell_to_module), cell_to_module_buff,
+    //     vecmem::copy::type::copy_type::host_to_device);
+    // (*m_copy)(vecmem::get_data(cell_indices_in_module), cell_indices_in_mod_buff,
+    //     vecmem::copy::type::copy_type::host_to_device);
 
-    // create and move the vectors on the device to vector views
-    vecmem::data::vector_view<std::size_t> cell_to_module_view =
-        cell_to_module_buff;
-    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view =
-        cell_indices_in_mod_buff;
+    // // create and move the vectors on the device to vector views
+    // vecmem::data::vector_view<std::size_t> cell_to_module_view =
+    //     cell_to_module_buff;
+    // vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view =
+    //     cell_indices_in_mod_buff;
     /*
      * Helper container for sparse CCL calculations.
      * Each inner vector corresponds to 1 module.
@@ -294,10 +294,10 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
      * and will indicate to which cluster, a particular cell in the module
      * belongs to.
      */
-    vecmem::data::jagged_vector_buffer<unsigned int> cell_cluster_label_buff(
+    vecmem::data::jagged_vector_buffer<unsigned int> sparse_ccl_indices_buff(
         std::vector<std::size_t>(cell_sizes.begin(), cell_sizes.end()),
         m_mr.main, m_mr.host);
-    m_copy->setup(cell_cluster_label_buff);
+    m_copy->setup(sparse_ccl_indices_buff);
 
     /*
      * cl_per_module_prefix_buff is a vector buffer with numbers of found
@@ -333,8 +333,8 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
     // Create views to pass to cluster finding kernel
     const cell_container_types::const_view cells_view(cells_data);
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view =
-        cell_cluster_label_buff;
+    vecmem::data::jagged_vector_view<unsigned int> sparse_ccl_indices_view =
+        sparse_ccl_indices_buff;
     vecmem::data::vector_view<std::size_t> cl_per_module_prefix_view =
         cl_per_module_prefix_buff;
 
@@ -344,7 +344,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
     // Invoke find clusters that will call cluster finding kernel
     kernels::find_clusters<<<blocksPerGrid, threadsPerBlock>>>(
-        cells_view, cell_cluster_label_view, cl_per_module_prefix_view);
+        cells_view, sparse_ccl_indices_view, cl_per_module_prefix_view);
 
     CUDA_ERROR_CHECK(cudaGetLastError());
     CUDA_ERROR_CHECK(cudaDeviceSynchronize());
