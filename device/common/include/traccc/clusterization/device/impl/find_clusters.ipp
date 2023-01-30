@@ -83,5 +83,6 @@ void find_clusters(
     vecmem::device_vector<std::size_t> device_clusters_per_module(
         clusters_per_module_view);
     device_clusters_per_module[module_number] = n_clusters;
+}
 
 }  // namespace traccc::device

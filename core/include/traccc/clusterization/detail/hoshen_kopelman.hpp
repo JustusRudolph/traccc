@@ -260,6 +260,7 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
 
     return num_clusters;
 }
+
 // overload Hoshen-Kopelman with parallelisation of just one cell
 template <typename cell_container_t, typename label_vector>
 TRACCC_HOST_DEVICE
