@@ -141,7 +141,6 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
                    i, i+1, curr_cell.channel0, curr_cell.channel1);
         }
         
-        // only check the cells that haven't been checked yet
         for (unsigned int j = 0; j < n_cells; j++) {
             // if one above and on left has been found, break out
             if (left_label * above_label > 0) { break;}
@@ -264,13 +263,77 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
 // overload Hoshen-Kopelman with parallelisation of just one cell
 template <typename cell_container_t, typename label_vector>
 TRACCC_HOST_DEVICE
-inline unsigned int hoshen_kopelman(std::size_t globalIndex, 
-                                    const cell_container_t& cells,
-                                    const traccc::cell cell,
-                                    label_vector& labels) {
+void hoshen_kopelman(std::size_t globalIndex, const cell_container_t& cells,
+                     unsigned int cell_index, label_vector& labels) {
     
-    return 0;
-}                                                        
+    bool include_diagonals = true;  // for debugging
+    unsigned int n_cells = cells.size();
+    traccc::cell cell = cells[cell_index];
+    unsigned int label = labels[cell_index];
+    // initialise labels to non-label integer (i.e. <1)
+    unsigned int left_label = 0;
+    unsigned int above_label = 0;
+    unsigned int diagonal_above_label = 0;
+    
+    // check all cells in the module for neighbours of current cell
+    for (unsigned int i = 0; i < n_cells; i++) {
+        // if one above and on left has been found, break out
+        if (left_label * above_label > 0) { break;}  // TODO: Try removing this line
+
+        if (is_left(cells[i], cell)) {
+            left_label = labels[i];
+            continue;
+        }
+        else if (is_above(cells[i], cell)) {
+            above_label = labels[i];
+            continue;
+        }
+        // following assumes no double diagonal without above set too
+        else if (is_diagonal_above(cells[i], cell)) {
+            diagonal_above_label = labels[i];
+        }
+    }
+    // now decision tree for what to do with neighbour information
+    if (left_label * above_label > 0) {
+        // make union
+        for (unsigned int j = 0; j < n_cells; j++) {
+            // overwrite all labels left and the connected labels of the current cell
+            if (labels[j] == left_label || labels[j] == label) {
+                labels[j] = above_label;
+            }
+        }
+    }
+    else if (left_label > 0) {
+        // set all with current label to left
+        for (unsigned int j = 0; j < n_cells; j++) {
+            // overwrite all cells with current label to the one left
+            if (labels[j] == label) {
+                labels[j] = left_label;
+            }
+        }
+    }
+    else if (above_label > 0) {
+        // set all with current label to above
+        for (unsigned int j = 0; j < n_cells; j++) {
+            // overwrite all cells with current label to the one above
+            if (labels[j] == label) {
+                labels[j] = above_label;
+            }
+        }
+    }
+    else if (diagonal_above_label > 0 && include_diagonals) {
+        // in case nothing next to, check the diagonals
+        for (unsigned int j = 0; j < n_cells; j++) {
+            // overwrite all cells with current label to the one diagonally above
+            if (labels[j] == label) {
+                labels[j] = diagonal_above_label;
+            }
+        }
+    }
+}
+
+// TRACCC_HOST_DEVICE
+// inline unsigned int 
 
 }  // namespace detail
 
