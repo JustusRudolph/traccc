@@ -75,7 +75,7 @@ void find_clusters(
     auto cluster_labels = device_cell_cluster_labels[module_number];
 
     // run H-K on the individual cell
-    detail::hoshen_kopelman(globalIndex, cells, cell_index, cluster_labels);
+    detail::hoshen_kopelman(module_number, cells, cell_index, cluster_labels);
 }
 
 TRACCC_HOST_DEVICE
@@ -91,6 +91,28 @@ void normalise_cluster_numbers(
         clusters_per_module_view);
     
     auto cluster_labels = device_cell_cluster_labels[module_number];
+}
+
+void set_init_cluster_labels(
+    unsigned int globalIndex,
+    vecmem::data::vector_view<std::size_t> cell_to_module_view,
+    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
+    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view) {
+
+    // make relevant device vectors
+    vecmem::device_vector<std::size_t> device_cell_to_module(
+        cell_to_module_view);
+    vecmem::device_vector<std::size_t> device_cell_indices_in_mod(
+        cell_indices_in_mod_view);
+    vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
+        cell_cluster_label_view);
+    
+    // get the module number and which cell in the module
+    std::size_t module_number = device_cell_to_module[globalIndex];
+    std::size_t cell_index = device_cell_indices_in_mod[globalIndex];
+
+    // set the label to the index + 1, since labels are 1...N, not 0 indexed
+    device_cell_cluster_labels[module_number][cell_index] = cell_index+1;
 }
 
 }  // namespace traccc::device

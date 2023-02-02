@@ -263,7 +263,7 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
 // overload Hoshen-Kopelman with parallelisation of just one cell
 template <typename cell_container_t, typename label_vector>
 TRACCC_HOST_DEVICE
-void hoshen_kopelman(std::size_t globalIndex, const cell_container_t& cells,
+void hoshen_kopelman(std::size_t module_number, const cell_container_t& cells,
                      unsigned int cell_index, label_vector& labels) {
     
     bool include_diagonals = true;  // for debugging
@@ -282,15 +282,27 @@ void hoshen_kopelman(std::size_t globalIndex, const cell_container_t& cells,
 
         if (is_left(cells[i], cell)) {
             left_label = labels[i];
+            if (module_number == 755) {
+                printf("For Cell %d in Module %d: Neighbour on the left with label %d.\n",
+                    (int) cell_index, (int) module_number, (int) left_label);
+            }
             continue;
         }
         else if (is_above(cells[i], cell)) {
             above_label = labels[i];
+            if (module_number == 755) {
+                printf("For Cell %d in Module %d: Neighbour above with label %d.\n",
+                    (int) cell_index, (int) module_number, (int) above_label);
+            }
             continue;
         }
         // following assumes no double diagonal without above set too
         else if (is_diagonal_above(cells[i], cell)) {
             diagonal_above_label = labels[i];
+            if (module_number == 755) {
+                printf("For Cell %d in Module %d: Neighbour diagonally above with label %d.\n",
+                    (int) cell_index, (int) module_number, (int) diagonal_above_label);
+            }
         }
     }
     // now decision tree for what to do with neighbour information

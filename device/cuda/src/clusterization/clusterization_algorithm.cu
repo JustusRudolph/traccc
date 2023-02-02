@@ -49,18 +49,10 @@ __global__ void setup_cluster_labels(
         */
     // get global index
     unsigned int global_idx = threadIdx.x + blockIdx.x * blockDim.x;
-    // make relevant device vectors
-    vecmem::device_vector<std::size_t> device_cell_to_module(
-        cell_to_module_view);
-    vecmem::device_vector<std::size_t> device_cell_indices_in_mod(
-        cell_indices_in_mod_view);
-    vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
-        cell_cluster_label_view);
 
-    std::size_t module_number = device_cell_to_module[global_idx];
-    std::size_t cell_index = device_cell_indices_in_mod[global_idx];
-    // set the label to the index + 1, since labels are 1...N, not 0 indexed
-    //device_cell_cluster_labels[module_number][cell_index] = cell_index+1;
+    device::set_init_cluster_labels(global_idx, cell_to_module_view, 
+                                    cell_indices_in_mod_view,
+                                    cell_cluster_label_view);
 }
 
 
@@ -401,13 +393,13 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         CUDA_ERROR_CHECK(cudaGetLastError());
         CUDA_ERROR_CHECK(cudaDeviceSynchronize());
 
-        blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
-        kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
-            cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
-            false, false, 755);  // check for module 755 after clusterisation
+        // blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
+        // kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
+        //     cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
+        //     false, false, 755);  // check for module 755 after clusterisation
         
-        CUDA_ERROR_CHECK(cudaGetLastError());
-        CUDA_ERROR_CHECK(cudaDeviceSynchronize());
+        // CUDA_ERROR_CHECK(cudaGetLastError());
+        // CUDA_ERROR_CHECK(cudaDeviceSynchronize());
 
         // normalise the output to have labels from just 1 -> N
         kernels::normalise_cluster_numbers<<<blocksPerGrid, threadsPerBlock>>>(

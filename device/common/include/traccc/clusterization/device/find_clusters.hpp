@@ -22,6 +22,16 @@
 
 namespace traccc::device {
 
+/// Function that sets up the labels for each cell, this is just
+/// the cell number in the module, so they all have a unique label
+/// to begin with when clusterisation begins later.
+TRACCC_HOST_DEVICE
+void set_init_cluster_labels(
+    unsigned int globalIndex,
+    vecmem::data::vector_view<std::size_t> cell_to_module_view,
+    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
+    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view);
+
 /// Function that finds the clusters using sparse_ccl algorithm
 ///
 /// It saves the cluster indices for each module in a jagged vector
@@ -46,6 +56,13 @@ void find_clusters(
     std::size_t globalIndex, const cell_container_types::const_view& cells_view,
     vecmem::data::vector_view<std::size_t> cell_module_view,
     vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
+    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
+    vecmem::data::vector_view<std::size_t> clusters_per_module_view);
+
+// function for setting cluster numbers to 1->N only, N distinct clusters
+TRACCC_HOST_DEVICE
+void normalise_cluster_numbers(
+    std::size_t module_number,
     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
     vecmem::data::vector_view<std::size_t> clusters_per_module_view);
 
