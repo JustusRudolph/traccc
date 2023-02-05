@@ -82,7 +82,7 @@ TRACCC_HOST_DEVICE inline bool is_left(traccc::cell a, traccc::cell b) {
 ///
 /// @return boolean to indicate if first cell is above cell b
 TRACCC_HOST_DEVICE inline bool is_above(traccc::cell a, traccc::cell b) {
-    return ((b.channel1 - a.channel1) == 1) && (b.channel0 == a.channel0);
+    return ((a.channel1 - b.channel1) == 1) && (b.channel0 == a.channel0);
 }
 
 /// Helper method to find if cell a is diagonally above b
@@ -92,7 +92,7 @@ TRACCC_HOST_DEVICE inline bool is_above(traccc::cell a, traccc::cell b) {
 ///
 /// @return boolean to indicate if first cell is above cell b
 TRACCC_HOST_DEVICE inline bool is_diagonal_above(traccc::cell a, traccc::cell b) {
-    return ((b.channel1 - a.channel1) == 1) &&
+    return ((a.channel1 - b.channel1) == 1) &&
             ((b.channel0 - a.channel0)*(b.channel0 - a.channel0) == 1);
 }
 
@@ -111,6 +111,7 @@ TRACCC_HOST_DEVICE inline bool is_far_enough2(traccc::cell a, traccc::cell b) {
 
 /// Hoshen-Kopelman Clusterization algorithm
 ///
+/// @param globalIndex is the current module, used for debugging only
 /// @param cells is the cell collection
 /// @param labels is the vector of the output indices (to which cluster a cell
 /// belongs to)
@@ -260,92 +261,201 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
     return num_clusters;
 }
 
-// overload Hoshen-Kopelman with parallelisation of just one cell
+/// Hoshen-Kopelman Clusterization algorithm overloaded for single cell
+/// parallelisation
+///
+/// @param module_number is the current module, only used for debug purposes
+/// @param cell_index is the index of the current cell in the cell collection
+/// @param cells is the cell collection
+/// @param labels is the vector of the output indices (to which cluster a cell
+///               belongs to)
+/// @param neighbour_index is the index of the neighbour to overwrite from
+/// @return whether the current label changed in this iteration of HK
 template <typename cell_container_t, typename label_vector>
 TRACCC_HOST_DEVICE
-void hoshen_kopelman(std::size_t module_number, const cell_container_t& cells,
-                     unsigned int cell_index, label_vector& labels) {
+bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
+                             const cell_container_t& cells, label_vector& labels,
+                             unsigned int& neighbour_index) {
     
+    unsigned int module_to_check = -1;  // pick which to probe with debug
     bool include_diagonals = true;  // for debugging
+
     unsigned int n_cells = cells.size();
     traccc::cell cell = cells[cell_index];
     unsigned int label = labels[cell_index];
+
     // initialise labels to non-label integer (i.e. <1)
+    // first three are for debug purposes only
     unsigned int left_label = 0;
     unsigned int above_label = 0;
     unsigned int diagonal_above_label = 0;
+    unsigned int neighbour_label = 0;
     
-    // check all cells in the module for neighbours of current cell
-    for (unsigned int i = 0; i < n_cells; i++) {
-        // if one above and on left has been found, break out
-        if (left_label * above_label > 0) { break;}  // TODO: Try removing this line
+    if (neighbour_index > n_cells) {
+        // check all cells in the module for neighbours of current cell
+        for (unsigned int i = 0; i < n_cells; i++) {
+            // if one neighbour has been found, break out
+            //if (left_label * above_label > 0) { break;}  // TODO: Try removing this line
 
-        if (is_left(cells[i], cell)) {
-            left_label = labels[i];
-            if (module_number == 755) {
-                printf("For Cell %d in Module %d: Neighbour on the left with label %d.\n",
-                    (int) cell_index, (int) module_number, (int) left_label);
+            if (is_above(cells[i], cell)) {
+                neighbour_label = labels[i];
+                neighbour_index = i;  // set for next run
+                above_label = neighbour_label;  // debug
+                break;
             }
-            continue;
-        }
-        else if (is_above(cells[i], cell)) {
-            above_label = labels[i];
-            if (module_number == 755) {
-                printf("For Cell %d in Module %d: Neighbour above with label %d.\n",
-                    (int) cell_index, (int) module_number, (int) above_label);
+            else if (is_left(cells[i], cell)) {
+                neighbour_label = labels[i];
+                neighbour_index = i;
+                left_label = neighbour_label;  // debug
+                break;
             }
-            continue;
-        }
-        // following assumes no double diagonal without above set too
-        else if (is_diagonal_above(cells[i], cell)) {
-            diagonal_above_label = labels[i];
-            if (module_number == 755) {
-                printf("For Cell %d in Module %d: Neighbour diagonally above with label %d.\n",
-                    (int) cell_index, (int) module_number, (int) diagonal_above_label);
+            // following assumes no double diagonal without above set too
+            else if (is_diagonal_above(cells[i], cell)) {
+                neighbour_label = labels[i];
+                neighbour_index = i;
+                diagonal_above_label = neighbour_label;  // debug
+                break;
             }
         }
+        if (left_label > 0) {
+            // set all with current label to left
+            if (module_number == module_to_check) {
+                printf("For Cell %d with label %d in Module %d: Neighbour cell left with label %d. Overwrite all with current label.\n",
+                    (int) cell_index, (int) label, (int) module_number, (int) left_label);
+            }
+            // for (unsigned int j = 0; j < n_cells; j++) {
+            //     // overwrite all cells with current label to the one left
+            //     if (labels[j] == label) {
+            //         labels[j] = left_label;
+            //     }
+            // }
+            labels[cell_index] = neighbour_label;
+
+        }
+        else if (above_label > 0) {
+            // set all with current label to above
+            if (module_number == module_to_check) {
+                printf("For Cell %d with label %d in Module %d: Neighbour cell above with label %d. Overwrite all with current label.\n",
+                    (int) cell_index, (int) label, (int) module_number, (int) above_label);
+            }
+            labels[cell_index] = neighbour_label;
+            // for (unsigned int j = 0; j < n_cells; j++) {
+            //     // overwrite all cells with current label to the one above
+            //     if (labels[j] == label) {
+            //         labels[j] = above_label;
+            //     }
+            // }
+        }
+        else if (diagonal_above_label > 0 && include_diagonals) {
+            // in case nothing next to, check the diagonals
+            if (module_number == module_to_check) {
+                printf("For Cell %d with label %d in Module %d: Neighbour cell diagonally above with label %d. Overwrite all with current label.\n",
+                    (int) cell_index, (int) label, (int) module_number, (int) diagonal_above_label);
+            }
+            for (unsigned int j = 0; j < n_cells; j++) {
+                // overwrite all cells with current label to the one diagonally above
+                if (labels[j] == label) {
+                    labels[j] = neighbour_label;
+                }
+            }
+        }
+    }
+
+    else {  // at least second time going through, know where the neighbour is
+        neighbour_label = labels[neighbour_index];
+        labels[cell_index] = neighbour_label;
     }
     // now decision tree for what to do with neighbour information
-    if (left_label * above_label > 0) {
-        // make union
-        for (unsigned int j = 0; j < n_cells; j++) {
-            // overwrite all labels left and the connected labels of the current cell
-            if (labels[j] == left_label || labels[j] == label) {
-                labels[j] = above_label;
-            }
-        }
-    }
-    else if (left_label > 0) {
-        // set all with current label to left
-        for (unsigned int j = 0; j < n_cells; j++) {
-            // overwrite all cells with current label to the one left
-            if (labels[j] == label) {
-                labels[j] = left_label;
-            }
-        }
-    }
-    else if (above_label > 0) {
-        // set all with current label to above
-        for (unsigned int j = 0; j < n_cells; j++) {
-            // overwrite all cells with current label to the one above
-            if (labels[j] == label) {
-                labels[j] = above_label;
-            }
-        }
-    }
-    else if (diagonal_above_label > 0 && include_diagonals) {
-        // in case nothing next to, check the diagonals
-        for (unsigned int j = 0; j < n_cells; j++) {
-            // overwrite all cells with current label to the one diagonally above
-            if (labels[j] == label) {
-                labels[j] = diagonal_above_label;
-            }
-        }
-    }
+    // if (left_label * above_label > 0) {
+    //     // make union
+    //     if (module_number == module_to_check) {
+    //         printf("For Cell %d with label %d in Module %d: Neighbour cells left and above with labels %d and %d. Overwrite all with current and left label.\n",
+    //             (int) cell_index, (int) label, (int) module_number, (int) left_label, (int) above_label);
+    //     }
+    //     for (unsigned int j = 0; j < n_cells; j++) {
+    //         // overwrite all labels left and the connected labels of the current cell
+    //         if (labels[j] == left_label || labels[j] == label) {
+    //             labels[j] = above_label;
+    //         }
+    //     }
+    // }
+    
+    // return whether current label_changed
+    bool label_changed = labels[cell_index] != label;
+    return label_changed;
 }
 
-// TRACCC_HOST_DEVICE
-// inline unsigned int 
+/// Simple helper function to set the initial cluster labels
+///
+/// @param cell_index is the index of the current cell in the cell collection
+/// @param labels is the vector which contains which cluster a cell
+///               belongs to
+TRACCC_HOST_DEVICE
+void setup_cluster_labels(std::size_t cell_index,
+                          vecmem::device_vector<unsigned int>& labels) {
+    
+    labels[cell_index] = cell_index + 1;
+}
+
+/// Normalisation of cluster numbers. This sets the cluster labels s.t. all
+/// labels are smaller than the total number of clusters. I.e., if there are
+/// N clusters, the labels will just be in range of 1->N. This function is
+/// parallelised by module.
+///
+/// @param labels is the vector containing the cluster labels of each cell
+/// @return The number of clusters in the module.
+template<typename label_vector>
+TRACCC_HOST_DEVICE
+inline unsigned int normalise_cluster_numbers(label_vector& labels) {
+    
+    unsigned int num_clusters = 0;
+    unsigned int n_cells = labels.size();
+    for (unsigned int i = 0; i < n_cells; i++) {
+        unsigned int j = 0;
+        for (j = 0; j < i; j++) {
+            if (labels[i] == labels[j]) {
+                // have already had this label
+                break;
+            }
+        }
+        if (i == j) {
+            // went through all previous ones and no match, so this one is unique
+            num_clusters++;
+        }
+    }
+    unsigned int curr_cluster_number = 1;  // Which one to overwrite with
+    for (unsigned int i = 0; i < n_cells; i++) {
+        if (labels[i] > num_clusters) {
+            // pick which to overwrite with
+            unsigned int j = 0;  // iterator
+            // how many times since last increment in curr_cluster_number
+            // thus, once this hits n_cells, we have gone one way around without
+            // finding the "curr_cluster_number", meaning it's not yet set.
+            unsigned int n_iterations = 0;
+
+            while (n_iterations < n_cells) {
+                if (labels[j] == curr_cluster_number) {
+                    curr_cluster_number++;  // check for the next one
+                    n_iterations = 0;
+                }
+                n_iterations++;
+                j++;
+                j = j % n_cells;  // loop back to front if end reached
+            }
+            // we have now picked which to overwrite with
+            for (unsigned int k = i+1; k < n_cells; k++) {
+                if (labels[k] == labels[i]) {
+                    labels[k] = curr_cluster_number;
+                }
+            }
+            // lastly, overwrite the initial one too
+            labels[i] = curr_cluster_number;
+        }
+
+    }
+
+    return num_clusters;
+}
 
 }  // namespace detail
 

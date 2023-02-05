@@ -24,6 +24,7 @@
 // System include(s).
 #include <algorithm>
 #include <string>
+#include <chrono>
 
 // Local include(s)
 #include "traccc/cuda/utils/definitions.hpp"
@@ -68,9 +69,17 @@ __global__ void find_clusters_cell_parallel(
      * the module it belongs to.
      */
     unsigned int cell_idx = threadIdx.x + blockIdx.x * blockDim.x;
+    bool label_changed = true;
+    unsigned int neighbour_index = 0;
+    neighbour_index -= 1;  // wrap around to be max to ensure no init neighbour def
 
-    device::find_clusters(cell_idx, cells_view, cell_to_module_view,
-                          cell_indices_in_mod_view, cell_cluster_label_view);
+    while(label_changed) {
+        label_changed = device::find_clusters_cell_parallel(
+                            cell_idx, cells_view, cell_to_module_view,
+                            cell_indices_in_mod_view, cell_cluster_label_view,
+                            neighbour_index);
+        __syncthreads();
+    }
 }
 
 
@@ -288,10 +297,16 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     vecmem::vector<std::size_t> cell_indices_in_module(n_cells_total);
     unsigned int curr_idx = 0;  // used to populate the above
     for (std::size_t i = 0; i < cell_sizes.size(); i++) {
+        if (i == 3000) {
+                printf("Module 3000 initialise: \n\n");
+            }
         for (std::size_t j = 0; j < cell_sizes[i]; j++) {
             cell_to_module[curr_idx] = i;  // i is the module number
             // j is the cell number in the module
             cell_indices_in_module[curr_idx] = j;
+            if (i == 3000) {
+                printf("cell_indices_in_module[%d] = %d\n", (int) curr_idx, (int) j);
+            }
             curr_idx++;
         }
     }
@@ -341,7 +356,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
             cell_to_module_view, cell_indices_in_mod_view, cell_cluster_label_view);
 
         CUDA_ERROR_CHECK(cudaGetLastError());
-        CUDA_ERROR_CHECK(cudaDeviceSynchronize()); 
+        CUDA_ERROR_CHECK(cudaDeviceSynchronize());
     }
 
     /*
@@ -385,6 +400,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         // get the grid size for using all cells
         blocksPerGrid = (n_cells_total + threadsPerBlock - 1) / threadsPerBlock;
 
+        auto start_clusterisation_time = std::chrono::system_clock::now();
         // Run cell parallelised kernel to get clusters
         kernels::find_clusters_cell_parallel<<<blocksPerGrid, threadsPerBlock>>>(
             cells_view, cell_to_module_view, cell_indices_in_mod_view,
@@ -393,10 +409,17 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         CUDA_ERROR_CHECK(cudaGetLastError());
         CUDA_ERROR_CHECK(cudaDeviceSynchronize());
 
-        // blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
+        auto end_clusterisation_time = std::chrono::system_clock::now();
+
+        std::chrono::duration<double> clusterisation_time =
+            end_clusterisation_time - start_clusterisation_time;
+        
+        printf("TIME TAKEN FOR HK CLUSTERISATION: %fs\n", clusterisation_time.count());
+
+        blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
         // kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
         //     cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
-        //     false, false, 755);  // check for module 755 after clusterisation
+        //     false, false, 3000);  // check for module 755 after clusterisation
         
         // CUDA_ERROR_CHECK(cudaGetLastError());
         // CUDA_ERROR_CHECK(cudaDeviceSynchronize());
@@ -407,17 +430,40 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
         CUDA_ERROR_CHECK(cudaGetLastError());
         CUDA_ERROR_CHECK(cudaDeviceSynchronize());
+        
+        auto end_normalisation_time = std::chrono::system_clock::now();
+        std::chrono::duration<double> normalisation_time =
+            end_normalisation_time - end_clusterisation_time;
+        
+        printf("TIME TAKEN FOR LABEL NORMALISATION: %fs\n", normalisation_time.count());
+
+        blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
+        kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
+            cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
+            false, false, 3000);  // check for module 755 after clusterisation
+        
+        CUDA_ERROR_CHECK(cudaGetLastError());
+        CUDA_ERROR_CHECK(cudaDeviceSynchronize());
     }
     else {  // parallelise by module
         // Calculating grid size for cluster finding kernel
         blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
 
+        auto start_clusterisation_time = std::chrono::system_clock::now();
         // Invoke find clusters that will call cluster finding kernel
         kernels::find_clusters<<<blocksPerGrid, threadsPerBlock>>>(
             cells_view, cell_cluster_label_view, cl_per_module_prefix_view);
-        
+
         CUDA_ERROR_CHECK(cudaGetLastError());
         CUDA_ERROR_CHECK(cudaDeviceSynchronize());
+
+        auto end_clusterisation_time = std::chrono::system_clock::now();
+
+        std::chrono::duration<double> clusterisation_time =
+            end_clusterisation_time - start_clusterisation_time;
+        
+        printf("TIME TAKEN FOR CCL CLUSTERISATION: %fs\n", clusterisation_time.count());
+    
     }
 
 
