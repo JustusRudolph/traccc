@@ -96,6 +96,28 @@ TRACCC_HOST_DEVICE inline bool is_diagonal_above(traccc::cell a, traccc::cell b)
             ((b.channel0 - a.channel0)*(b.channel0 - a.channel0) == 1);
 }
 
+/// Helper method to find if cell a is left diagonally above b
+///
+/// @param a the first cell
+/// @param b the second cell
+///
+/// @return boolean to indicate if first cell is above cell b
+TRACCC_HOST_DEVICE inline bool is_diagonal_above_left(traccc::cell a, traccc::cell b) {
+    return ((a.channel1 - b.channel1) == 1) && ((b.channel0 - a.channel0) == 1);
+}
+
+/// Helper method to find if cell a is left diagonally above b
+///
+/// @param a the first cell
+/// @param b the second cell
+///
+/// @return boolean to indicate if first cell is above cell b
+TRACCC_HOST_DEVICE inline bool is_diagonal_above_right(traccc::cell a, traccc::cell b) {
+    return ((a.channel1 - b.channel1) == 1) && ((a.channel0 - b.channel0) == 1);
+}
+
+
+
 
 /// Helper method to find define distance,
 /// does not need abs, as channels are sorted in
@@ -288,33 +310,46 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
     // first three are for debug purposes only
     unsigned int left_label = 0;
     unsigned int above_label = 0;
-    unsigned int diagonal_above_label = 0;
+    unsigned int diagonal_left_label = 0;
+    unsigned int diagonal_right_label = 0;
     unsigned int neighbour_label = 0;
     
-    if (neighbour_index > n_cells) {
+    if ((neighbour_index+1) == 0) {  // -1 means unset
         // check all cells in the module for neighbours of current cell
         for (unsigned int i = 0; i < n_cells; i++) {
             // if one neighbour has been found, break out
             //if (left_label * above_label > 0) { break;}  // TODO: Try removing this line
-
-            if (is_above(cells[i], cell)) {
-                neighbour_label = labels[i];
-                neighbour_index = i;  // set for next run
-                above_label = neighbour_label;  // debug
-                break;
+            
+            if (!(left_label + diagonal_left_label) && is_above(cells[i], cell)) {
+                // overwrite and take only above if there is a cell above
+                above_label = labels[i];
+                neighbour_label = above_label;
+                neighbour_index = i+1;  // set for next run, i+1 so it matches
+                                        // the other cases
+                break;  // everything links to above so can break out
             }
-            else if (is_left(cells[i], cell)) {
-                neighbour_label = labels[i];
-                neighbour_index = i;
-                left_label = neighbour_label;  // debug
-                break;
+            else if (!(left_label + diagonal_left_label) && is_left(cells[i], cell)) {
+                // only get left cell information if top left isn't a neighbour
+                left_label = labels[i];
+                neighbour_label = neighbour_label * n_cells + left_label;
+                neighbour_index = (neighbour_index + 1) * (n_cells + 1) + i+1;
+                // above right and left are the unlinked ones
             }
-            // following assumes no double diagonal without above set too
-            else if (is_diagonal_above(cells[i], cell)) {
-                neighbour_label = labels[i];
-                neighbour_index = i;
-                diagonal_above_label = neighbour_label;  // debug
-                break;
+            else if (is_diagonal_right(cells[i], cell)) {
+                // left or diag left and diagonal right create problems, need to
+                // have them together, neighbour_label right now contains
+                // either left_label or diagonal_left_label
+                diagonal_right_label = labels[i];
+                neighbour_label = neighbour_label * n_cells + diagonal_right_label;
+                neighbour_index = (neighbour_index + 1) * (n_cells + 1) + i+1;
+            }
+            else if (!(left_label + diagonal_left_label) &&
+                     is_diagonal_left(cells[i], cell)) {
+                // left links to diagonal left so only set diagonal left label
+                // if left unset
+                diagonal_left_label = labels[i];
+                neighbour_label = neighbour_label * n_cells + diagonal_left_label;
+                neighbour_index = (neighbour_index + 1) * (n_cells + 1) + i+1;
             }
         }
         if (left_label > 0) {
@@ -329,7 +364,7 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
             //         labels[j] = left_label;
             //     }
             // }
-            labels[cell_index] = neighbour_label;
+            labels[cell_index] = left_label;
 
         }
         else if (above_label > 0) {
@@ -338,7 +373,7 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
                 printf("For Cell %d with label %d in Module %d: Neighbour cell above with label %d. Overwrite all with current label.\n",
                     (int) cell_index, (int) label, (int) module_number, (int) above_label);
             }
-            labels[cell_index] = neighbour_label;
+            labels[cell_index] = above_label;
             // for (unsigned int j = 0; j < n_cells; j++) {
             //     // overwrite all cells with current label to the one above
             //     if (labels[j] == label) {
@@ -346,23 +381,46 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
             //     }
             // }
         }
-        else if (diagonal_above_label > 0 && include_diagonals) {
+        else if (diagonal_right_label > 0 && include_diagonals) {
             // in case nothing next to, check the diagonals
             if (module_number == module_to_check) {
-                printf("For Cell %d with label %d in Module %d: Neighbour cell diagonally above with label %d. Overwrite all with current label.\n",
-                    (int) cell_index, (int) label, (int) module_number, (int) diagonal_above_label);
+                printf("For Cell %d with label %d in Module %d: Neighbour cell diagonally right with label %d. Overwrite all with current label.\n",
+                    (int) cell_index, (int) label, (int) module_number, (int) diagonal_right_label);
             }
-            for (unsigned int j = 0; j < n_cells; j++) {
-                // overwrite all cells with current label to the one diagonally above
-                if (labels[j] == label) {
-                    labels[j] = neighbour_label;
-                }
+            labels[cell_index] = diagonal_right_label;
+            // for (unsigned int j = 0; j < n_cells; j++) {
+            //     // overwrite all cells with current label to the one diagonally above
+            //     if (labels[j] == label) {
+            //         labels[j] = neighbour_label;
+            //     }
+            // }
+        }
+        else if (diagonal_left_label > 0 && include_diagonals) {
+            // in case nothing next to, check the diagonals
+            if (module_number == module_to_check) {
+                printf("For Cell %d with label %d in Module %d: Neighbour cell diagonally left with label %d. Overwrite all with current label.\n",
+                    (int) cell_index, (int) label, (int) module_number, (int) diagonal_left_label);
             }
+            labels[cell_index] = diagonal_left_label;
+            // for (unsigned int j = 0; j < n_cells; j++) {
+            //     // overwrite all cells with current label to the one diagonally above
+            //     if (labels[j] == label) {
+            //         labels[j] = neighbour_label;
+            //     }
+            // }
         }
     }
 
-    else {  // at least second time going through, know where the neighbour is
-        neighbour_label = labels[neighbour_index];
+    else {  // at least second time going through, know where the neighbour(s) are
+        unsigned int nn0_index = neighbour_index % (n_cells+1) - 1;
+        unsigned int nn1_index = neighbour_index / (n_cells+1) - 2;
+
+        if ((nn1_index + 2) == 0) {
+            // only one neighbour
+            neighbour_label = labels[nn0_index]
+
+        neighbour_label = labels[nn0_index];
+        // TODO how to merge the two? Just take nn0 for now
         labels[cell_index] = neighbour_label;
     }
     // now decision tree for what to do with neighbour information
