@@ -64,9 +64,9 @@ bool find_clusters_cell_parallel(
     // get the current module number from the current cell idx
     std::size_t module_number = device_cell_to_module.at(globalIndex);
     std::size_t cell_index = device_cell_indices_in_mod.at(globalIndex);
-    if (module_number == 3000) {
-        printf("Module 3000: cell_indices_in_module[%d] = %d\n", (int) globalIndex, (int) cell_index);
-    }
+    // if (module_number == 3000) {
+    //     printf("Module 3000: cell_indices_in_module[%d] = %d\n", (int) globalIndex, (int) cell_index);
+    // }
 
     // Initialise the jagged device vector for cell cluster indices
     vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
