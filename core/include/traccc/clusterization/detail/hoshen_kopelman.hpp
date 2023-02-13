@@ -335,7 +335,7 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
                 neighbour_index = (neighbour_index + 1) * (n_cells + 1) + i+1;
                 // above right and left are the unlinked ones
             }
-            else if (is_diagonal_right(cells[i], cell)) {
+            else if (is_diagonal_above_right(cells[i], cell)) {
                 // left or diag left and diagonal right create problems, need to
                 // have them together, neighbour_label right now contains
                 // either left_label or diagonal_left_label
@@ -344,7 +344,7 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
                 neighbour_index = (neighbour_index + 1) * (n_cells + 1) + i+1;
             }
             else if (!(left_label + diagonal_left_label) &&
-                     is_diagonal_left(cells[i], cell)) {
+                     is_diagonal_above_left(cells[i], cell)) {
                 // left links to diagonal left so only set diagonal left label
                 // if left unset
                 diagonal_left_label = labels[i];
@@ -417,8 +417,8 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
 
         if ((nn1_index + 2) == 0) {
             // only one neighbour
-            neighbour_label = labels[nn0_index]
-
+            neighbour_label = labels[nn0_index];
+        }
         neighbour_label = labels[nn0_index];
         // TODO how to merge the two? Just take nn0 for now
         labels[cell_index] = neighbour_label;
