@@ -96,17 +96,30 @@ TRACCC_HOST_DEVICE inline bool is_diagonal_above(traccc::cell a, traccc::cell b)
             ((b.channel0 - a.channel0)*(b.channel0 - a.channel0) == 1);
 }
 
+/// Find function as part of union-find algo
+/// Finds which cluster the current cell belongs to by looping through
+/// until getting to root cell
+///
+/// @param cell_index is the index of the current cell in the cell collection
+/// @param cells is the cell collection
+/// @param labels is the vector of the output indices (to which cluster a cell
+///               belongs to)
+/// @param neighbour_index is the index of the neighbour to overwrite from
+/// 
+TRACCC_HOST_DEVICE
+inline void hk_find(unsigned int cell_index,
+                    vecmem::device_vector<unsigned int>& labels) {
+    
+    unsigned int curr_index = cell_index;
 
-/// Helper method to find define distance,
-/// does not need abs, as channels are sorted in
-/// column major
-///
-/// @param a the first cell
-/// @param b the second cell
-///
-/// @return boolan to indicate !8-cell connectivity
-TRACCC_HOST_DEVICE inline bool is_far_enough2(traccc::cell a, traccc::cell b) {
-    return (a.channel1 - b.channel1) > 1;
+    // labels are initially just the index + 1
+    // so if the current label is the same as the current index+1, then
+    // we are at the origin of the cluster
+    while (curr_index != (labels[curr_index] - 1)) {
+        curr_index = labels[curr_index] - 1;  // to check next point
+    }
+    // we reach the point of the origin
+    labels[cell_index] = labels[curr_index];
 }
 
 /// Hoshen-Kopelman Clusterization algorithm
@@ -274,8 +287,8 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
 template <typename cell_container_t, typename label_vector>
 TRACCC_HOST_DEVICE
 bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
-                             const cell_container_t& cells, label_vector& labels,
-                             unsigned int& neighbour_index) {
+                    const cell_container_t& cells, label_vector& labels,
+                    unsigned int& neighbour_index) {
     
     unsigned int module_to_check = -1;  // pick which to probe with debug
     bool include_diagonals = true;  // for debugging
@@ -383,6 +396,49 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
     // return whether current label_changed
     bool label_changed = labels[cell_index] != label;
     return label_changed;
+}
+
+/// Find the nearest neighbour of the current cell being probed. In order, it
+/// will select left, diag left, above, diag right as its sole nearest neighbour.
+/// Then, write the cluster label from that nearest neighbour into current.
+///
+/// @param cell_index is the index of the current cell in the cell collection
+/// @param cells is the cell collection. Sorted by column
+/// @param labels is the vector of the output indices (to which cluster a cell
+///               belongs to)
+template <typename cell_container_t, typename label_vector>
+TRACCC_HOST_DEVICE
+void write_from_NN(unsigned int cell_index, const cell_container_t& cells,
+                   label_vector& labels) {
+    
+    unsigned int n_cells = cells.size();
+    traccc::cell cell = cells[cell_index];
+ 
+    // check all cells in the module from current cell to the start
+    for (unsigned int i = 1; i <= cell_index; i++) {
+        // if one neighbour has been found, break out
+        // move steps up from the current cell
+        unsigned int index_to_check = cell_index - i;
+        traccc::cell cell_to_check = cells[index_to_check];
+
+        // since it's sorted, this is necessarily positive
+        unsigned int row_diff = cell.channel1 - cell_to_check.channel1;
+        
+        if (row_diff <= 1) {  // within reasonable territory
+            unsigned int col_diff = cell.channel0 - cell_to_check.channel0;
+            if (col_diff * col_diff <= 1) {  // within one cell
+                // have found a neighbour that is above/left, write its label
+                labels[cell_index] = labels[index_to_check];
+            }
+            else {
+                continue;  // move to next cell if this cell is not a NN above/left
+            }
+        }
+        else {
+            break;  // if outside range, there will be no more found
+        }
+    }
+
 }
 
 /// Simple helper function to set the initial cluster labels

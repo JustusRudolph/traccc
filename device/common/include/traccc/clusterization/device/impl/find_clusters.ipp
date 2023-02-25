@@ -85,6 +85,37 @@ bool find_clusters_cell_parallel(
 }
 
 TRACCC_HOST_DEVICE
+bool find_clusters_cell_parallel_passthrough(
+    std::size_t module_number, unsigned int cell_index,
+    const vecmem::device_vector<const traccc::cell>& cells,
+    vecmem::device_vector<unsigned int>& labels,
+    unsigned int& neighbour_index) {
+    
+    // run H-K on the individual cell
+    bool label_changed = detail::hoshen_kopelman(module_number, cell_index, cells,
+                                                 labels, neighbour_index);
+    return label_changed;
+}
+
+TRACCC_HOST_DEVICE
+void write_from_NN(unsigned int cell_index,
+                   const vecmem::device_vector<const traccc::cell>& cells,
+                   vecmem::device_vector<unsigned int>& labels) {
+    
+    // pass the data through and overwrite current label if there
+    // is a nearest neighbour above/left
+    detail::write_from_NN(cell_index, cells, labels);
+    }
+
+TRACCC_HOST_DEVICE
+void hk_find(unsigned int cell_index, 
+            vecmem::device_vector<unsigned int>& labels) {
+
+    // pass the data through and overwrite relevant label
+    detail::hk_find(cell_index, labels);
+    }
+
+TRACCC_HOST_DEVICE
 void normalise_cluster_numbers(
     std::size_t module_number,
     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
