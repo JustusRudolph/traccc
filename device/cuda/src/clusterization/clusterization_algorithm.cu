@@ -98,28 +98,28 @@ __global__ void find_clusters_cell_parallel(
     vecmem::device_vector<unsigned int> cluster_labels = 
         device_cell_cluster_labels[module_number];
     
-    bool label_changed = true;
-    unsigned int neighbour_index = 0;
-    neighbour_index--;  // wrap around to be max to ensure no init neighbour def
-    unsigned int n_iters = 0;
+    // bool label_changed = true;
+    // unsigned int neighbour_index = 0;
+    // neighbour_index--;  // wrap around to be max to ensure no init neighbour def
+    // unsigned int n_iters = 0;
 
-    while(label_changed) {
-        label_changed = device::find_clusters_cell_parallel_passthrough(
-                        module_number, cell_index, cells,
-                        cluster_labels, neighbour_index);
-        __syncthreads();
-        n_iters++;
-    }
+    // while(label_changed) {
+    //     label_changed = device::find_clusters_cell_parallel_passthrough(
+    //                     module_number, cell_index, cells,
+    //                     cluster_labels, neighbour_index);
+    //     __syncthreads();
+    //     n_iters++;
+    // }
     // // if (n_iters >= 10) {
     // //     printf("%d iterations in cell %d.\n", n_iters, cell_idx);
     // // }
 
-    // // first write NN value into current
-    // device::write_from_NN(cell_index, cells, cluster_labels);
-    // // ensure all cells have found their NN before continuing:
-    // __syncthreads();
-    // // lastly, look through the labels and assign iteratively
-    // device::hk_find(cell_index, cluster_labels);
+    // first write NN value into current
+    device::write_from_NN(cell_index, cells, cluster_labels);
+    // ensure all cells have found their NN before continuing:
+    __syncthreads();
+    // lastly, look through the labels and assign iteratively
+    device::hk_find(cell_index, cluster_labels);
 }
 
 

@@ -429,6 +429,7 @@ void write_from_NN(unsigned int cell_index, const cell_container_t& cells,
             if (col_diff * col_diff <= 1) {  // within one cell
                 // have found a neighbour that is above/left, write its label
                 labels[cell_index] = labels[index_to_check];
+                //break;
             }
             else {
                 continue;  // move to next cell if this cell is not a NN above/left
