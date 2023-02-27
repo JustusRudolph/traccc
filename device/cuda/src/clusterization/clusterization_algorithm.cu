@@ -120,8 +120,8 @@ __global__ void find_clusters_cell_parallel(
     unsigned int NN_index =
         device::setup_cluster_labels_and_NN(cell_index, cells, cluster_labels);
 
-    if ((NN_index + 1) == 0) {
-        printf("Do we ever hit this?\n");
+    if (NN_index == cells.size()) {
+        //printf("Found an origin cell!\n");
         // we have hit an origin label, set it
         std::size_t* cluster_size = &device_clusters_per_module[module_number];
         unsigned int* cluster_size_uint = (unsigned int*) cluster_size;
@@ -460,7 +460,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
     if (parallelise_by_cell) {
         // get the grid size for using all cells
-        threadsPerBlock = 64;
+        threadsPerBlock = 1024;
         blocksPerGrid = (n_cells_total + threadsPerBlock - 1) / threadsPerBlock;
 
         auto start_clusterisation_time = std::chrono::system_clock::now();

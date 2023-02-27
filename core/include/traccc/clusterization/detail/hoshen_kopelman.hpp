@@ -454,7 +454,8 @@ unsigned int setup_cluster_labels_and_NN(
     unsigned int n_cells = cells.size();
     traccc::cell cell = cells[cell_index];
 
-    unsigned int NN_index = 0;
+    // will be overwritten as less if we find a neighbour
+    unsigned int NN_index = n_cells;
  
     // check all cells in the module from current cell to the start
     for (unsigned int i = 1; i <= cell_index; i++) {
@@ -473,15 +474,12 @@ unsigned int setup_cluster_labels_and_NN(
                 // to point to that neighbour
                 NN_index = index_to_check;
                 labels[cell_index] = n_cells + index_to_check + 1;
-                break;  // found a neighbour
             }
             else {
                 continue;  // move to next cell if this cell is not a NN above/left
             }
         }
         else {
-            NN_index--;  // outside range, no neighbour
-                         // this is a origin cell in a cluster
             break;  // if outside range, there will be no more found
         }
     }
