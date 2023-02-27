@@ -74,12 +74,30 @@ void write_from_NN(unsigned int cell_index,
                    const vecmem::device_vector<const traccc::cell>& cells,
                    vecmem::device_vector<unsigned int>& labels);
 
+
+/// Function that sets up the labels for each cell. If a cell is a
+/// cluster origin cell, the nearest neighbour index is -1, and its label
+/// is not written yet. Needs atomic add in the following step.
+/// A cell with a neighbour above/left has its cluster label written
+/// as n_cells + neighbour_index + 1 to point to a neighbour distinctly
+TRACCC_HOST_DEVICE
+unsigned int setup_cluster_labels_and_NN(
+    std::size_t cell_index,
+    const vecmem::device_vector<const traccc::cell>& cells,
+    vecmem::device_vector<unsigned int>& labels);
+
 // find the origin of the cluster for each cell, implementation
 // of find() part of a union-find clusterisation algorithm
 TRACCC_HOST_DEVICE
 void hk_find(
     unsigned int cell_index, 
     vecmem::device_vector<unsigned int>& labels);
+
+template<typename val_t>
+TRACCC_HOST_DEVICE
+void write_value(val_t* old_val, val_t new_val) {
+    detail::write_value(old_val, new_val);
+}
 
 // function for setting cluster numbers to 1->N only, N distinct clusters
 TRACCC_HOST_DEVICE

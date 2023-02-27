@@ -33,35 +33,36 @@ namespace traccc::cuda {
 namespace kernels {
 
 
-__global__ void setup_cluster_labels(
-    vecmem::data::vector_view<std::size_t> cell_to_module_view,
-    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view) {
-    /*
-        * This function sets up labels for every cell. Before running
-        * Hoshen-Kopelman, each vector in the jagged vector cell_cluster_label_view
-        * (which corresponds to one module each), is changed from being all
-        * zeros to an array from 1 to N, where N is the number of cells in
-        * the given module that are activated. Note that because we are dealing
-        * with an inconsistent device vector, we just launch K threads, where K
-        * is the total number of cells. This is in place of doing a N threads
-        * for each module, the (module, cell) number being represented by (x,y)
-        * in the threadIdx.
-        */
-    // get global index
-    unsigned int global_idx = threadIdx.x + blockIdx.x * blockDim.x;
+// __global__ void setup_cluster_labels(
+//     vecmem::data::vector_view<std::size_t> cell_to_module_view,
+//     vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
+//     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view) {
+//     /*
+//         * This function sets up labels for every cell. Before running
+//         * Hoshen-Kopelman, each vector in the jagged vector cell_cluster_label_view
+//         * (which corresponds to one module each), is changed from being all
+//         * zeros to an array from 1 to N, where N is the number of cells in
+//         * the given module that are activated. Note that because we are dealing
+//         * with an inconsistent device vector, we just launch K threads, where K
+//         * is the total number of cells. This is in place of doing a N threads
+//         * for each module, the (module, cell) number being represented by (x,y)
+//         * in the threadIdx.
+//         */
+//     // get global index
+//     unsigned int global_idx = threadIdx.x + blockIdx.x * blockDim.x;
 
-    device::set_init_cluster_labels(global_idx, cell_to_module_view, 
-                                    cell_indices_in_mod_view,
-                                    cell_cluster_label_view);
-}
+//     device::set_init_cluster_labels(global_idx, cell_to_module_view, 
+//                                     cell_indices_in_mod_view,
+//                                     cell_cluster_label_view);
+// }
 
 
 __global__ void find_clusters_cell_parallel(
     const cell_container_types::const_view cells_view,
     vecmem::data::vector_view<std::size_t> cell_to_module_view,
     vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view) {
+    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
+    vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
     /*
      * this function is the same as find_clusters but instead of every module
      * being a thread, every cell is a thread instead. Thus, it has an
@@ -87,8 +88,11 @@ __global__ void find_clusters_cell_parallel(
     std::size_t cell_index = device_cell_indices_in_mod.at(thread_idx);
 
     // Initialise the jagged device vector for cell cluster indices
+    // and the device vector for the number of clusters per module
     vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
         cell_cluster_label_view);
+    vecmem::device_vector<std::size_t> device_clusters_per_module(
+        clusters_per_module_view);
 
     // Get the cells for the current module and the cell this thread
     // is looking at
@@ -98,28 +102,40 @@ __global__ void find_clusters_cell_parallel(
     vecmem::device_vector<unsigned int> cluster_labels = 
         device_cell_cluster_labels[module_number];
     
-    bool label_changed = true;
-    unsigned int neighbour_index = 0;
-    neighbour_index--;  // wrap around to be max to ensure no init neighbour def
-    unsigned int n_iters = 0;
+    // bool label_changed = true;
+    // unsigned int neighbour_index = 0;
+    // neighbour_index--;  // wrap around to be max to ensure no init neighbour def
+    // unsigned int n_iters = 0;
 
-    while(label_changed) {
-        label_changed = device::find_clusters_cell_parallel_passthrough(
-                        module_number, cell_index, cells,
-                        cluster_labels, neighbour_index);
-        __syncthreads();
-        n_iters++;
-    }
+    // while(label_changed) {
+    //     label_changed = device::find_clusters_cell_parallel_passthrough(
+    //                     module_number, cell_index, cells,
+    //                     cluster_labels, neighbour_index);
+    //     __syncthreads();
+    //     n_iters++;
+    // }
     // // if (n_iters >= 10) {
     // //     printf("%d iterations in cell %d.\n", n_iters, cell_idx);
     // // }
+    unsigned int NN_index =
+        device::setup_cluster_labels_and_NN(cell_index, cells, cluster_labels);
 
-    // // first write NN value into current
-    // device::write_from_NN(cell_index, cells, cluster_labels);
-    // // ensure all cells have found their NN before continuing:
-    // __syncthreads();
-    // // lastly, look through the labels and assign iteratively
-    // device::hk_find(cell_index, cluster_labels);
+    if ((NN_index + 1) == 0) {
+        printf("Do we ever hit this?\n");
+        // we have hit an origin label, set it
+        std::size_t* cluster_size = &device_clusters_per_module[module_number];
+        unsigned int* cluster_size_uint = (unsigned int*) cluster_size;
+        unsigned int cluster_label = atomicAdd(cluster_size_uint, 1) + 1;
+        // device::write_value(&cluster_labels[cell_index], cluster_label);
+        cluster_labels[cell_index] = cluster_label;
+    }
+
+    // first write NN value into current
+    //device::write_from_NN(cell_index, cells, cluster_labels);
+    // ensure all cells have found their NN before continuing:
+    __syncthreads();
+    // lastly, look through the labels and assign iteratively
+    device::hk_find(cell_index, cluster_labels);
 }
 
 
@@ -392,18 +408,18 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view =
         cell_cluster_label_buff;
 
-    if (parallelise_by_cell) {
-        // only if parallelising the clusterisation cell by cell do we
-        // give each cell a label before clusterisation
-        blocksPerGrid = (n_cells_total + threadsPerBlock - 1) / threadsPerBlock;
+    // if (parallelise_by_cell) {
+    //     // only if parallelising the clusterisation cell by cell do we
+    //     // give each cell a label before clusterisation
+    //     blocksPerGrid = (n_cells_total + threadsPerBlock - 1) / threadsPerBlock;
 
-        // Invoke find clusters that will call cluster finding kernel
-        kernels::setup_cluster_labels<<<blocksPerGrid, threadsPerBlock>>>(
-            cell_to_module_view, cell_indices_in_mod_view, cell_cluster_label_view);
+    //     // Invoke find clusters that will call cluster finding kernel
+    //     kernels::setup_cluster_labels<<<blocksPerGrid, threadsPerBlock>>>(
+    //         cell_to_module_view, cell_indices_in_mod_view, cell_cluster_label_view);
 
-        CUDA_ERROR_CHECK(cudaGetLastError());
-        CUDA_ERROR_CHECK(cudaDeviceSynchronize());
-    }
+    //     CUDA_ERROR_CHECK(cudaGetLastError());
+    //     CUDA_ERROR_CHECK(cudaDeviceSynchronize());
+    // }
 
     /*
      * cl_per_module_prefix_buff is a vector buffer with numbers of found
@@ -451,7 +467,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         // Run cell parallelised kernel to get clusters
         kernels::find_clusters_cell_parallel<<<blocksPerGrid, threadsPerBlock>>>(
             cells_view, cell_to_module_view, cell_indices_in_mod_view,
-            cell_cluster_label_view);
+            cell_cluster_label_view, cl_per_module_prefix_view);
 
         CUDA_ERROR_CHECK(cudaGetLastError());
         CUDA_ERROR_CHECK(cudaDeviceSynchronize());
@@ -465,7 +481,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
         // go back to module wide parallelisation
         threadsPerBlock = 64;
-        blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
+        // blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
         // kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
         //     cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
         //     true, false, 3000);  // check for module 755 after clusterisation
@@ -474,17 +490,17 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         // CUDA_ERROR_CHECK(cudaDeviceSynchronize());
 
         // normalise the output to have labels from just 1 -> N
-        kernels::normalise_cluster_numbers<<<blocksPerGrid, threadsPerBlock>>>(
-            cell_cluster_label_view, cl_per_module_prefix_view);
+        // kernels::normalise_cluster_numbers<<<blocksPerGrid, threadsPerBlock>>>(
+        //     cell_cluster_label_view, cl_per_module_prefix_view);
 
-        CUDA_ERROR_CHECK(cudaGetLastError());
-        CUDA_ERROR_CHECK(cudaDeviceSynchronize());
+        // CUDA_ERROR_CHECK(cudaGetLastError());
+        // CUDA_ERROR_CHECK(cudaDeviceSynchronize());
         
-        auto end_normalisation_time = std::chrono::system_clock::now();
-        std::chrono::duration<double> normalisation_time =
-            end_normalisation_time - end_clusterisation_time;
+        // auto end_normalisation_time = std::chrono::system_clock::now();
+        // std::chrono::duration<double> normalisation_time =
+        //     end_normalisation_time - end_clusterisation_time;
         
-        printf("TIME TAKEN FOR LABEL NORMALISATION: %fs\n", normalisation_time.count());
+        // printf("TIME TAKEN FOR LABEL NORMALISATION: %fs\n", normalisation_time.count());
         // kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
         //     cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
         //     false, false, 970);  // check for module 755 after clusterisation

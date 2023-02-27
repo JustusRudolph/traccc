@@ -98,6 +98,19 @@ bool find_clusters_cell_parallel_passthrough(
 }
 
 TRACCC_HOST_DEVICE
+unsigned int setup_cluster_labels_and_NN(
+    std::size_t cell_index,
+    const vecmem::device_vector<const traccc::cell>& cells,
+    vecmem::device_vector<unsigned int>& labels) {
+
+    // pass data through, set current label to unique identifier
+    unsigned int NN_index =
+        detail::setup_cluster_labels_and_NN(cell_index, cells, labels);
+
+    return NN_index;
+}
+
+TRACCC_HOST_DEVICE
 void write_from_NN(unsigned int cell_index,
                    const vecmem::device_vector<const traccc::cell>& cells,
                    vecmem::device_vector<unsigned int>& labels) {
@@ -105,15 +118,15 @@ void write_from_NN(unsigned int cell_index,
     // pass the data through and overwrite current label if there
     // is a nearest neighbour above/left
     detail::write_from_NN(cell_index, cells, labels);
-    }
+}
 
 TRACCC_HOST_DEVICE
-void hk_find(unsigned int cell_index, 
+void hk_find(unsigned int cell_index,
             vecmem::device_vector<unsigned int>& labels) {
 
     // pass the data through and overwrite relevant label
     detail::hk_find(cell_index, labels);
-    }
+}
 
 TRACCC_HOST_DEVICE
 void normalise_cluster_numbers(
@@ -135,28 +148,28 @@ void normalise_cluster_numbers(
 
 }
 
-void set_init_cluster_labels(
-    unsigned int globalIndex,
-    vecmem::data::vector_view<std::size_t> cell_to_module_view,
-    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view) {
+// void set_init_cluster_labels(
+//     unsigned int globalIndex,
+//     vecmem::data::vector_view<std::size_t> cell_to_module_view,
+//     vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
+//     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view) {
 
-    // make relevant device vectors
-    vecmem::device_vector<std::size_t> device_cell_to_module(
-        cell_to_module_view);
-    vecmem::device_vector<std::size_t> device_cell_indices_in_mod(
-        cell_indices_in_mod_view);
-    vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
-        cell_cluster_label_view);
+//     // make relevant device vectors
+//     vecmem::device_vector<std::size_t> device_cell_to_module(
+//         cell_to_module_view);
+//     vecmem::device_vector<std::size_t> device_cell_indices_in_mod(
+//         cell_indices_in_mod_view);
+//     vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
+//         cell_cluster_label_view);
     
-    // get the module number and which cell in the module
-    std::size_t module_number = device_cell_to_module[globalIndex];
-    std::size_t cell_index = device_cell_indices_in_mod[globalIndex];
+//     // get the module number and which cell in the module
+//     std::size_t module_number = device_cell_to_module[globalIndex];
+//     std::size_t cell_index = device_cell_indices_in_mod[globalIndex];
 
-    auto cluster_labels = device_cell_cluster_labels[module_number];
+//     auto cluster_labels = device_cell_cluster_labels[module_number];
 
-    // set the label to the index + 1, since labels are 1...N, not 0 indexed
-    detail::setup_cluster_labels(cell_index, cluster_labels);
-}
+//     // set the label to the index + 1, since labels are 1...N, not 0 indexed
+//     detail::setup_cluster_labels(cell_index, cluster_labels);
+// }
 
 }  // namespace traccc::device
