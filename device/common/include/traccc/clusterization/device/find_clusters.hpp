@@ -21,17 +21,6 @@
 #include <cstddef>
 
 namespace traccc::device {
-
-/// Function that sets up the labels for each cell, this is just
-/// the cell number in the module, so they all have a unique label
-/// to begin with when clusterisation begins later.
-TRACCC_HOST_DEVICE
-void set_init_cluster_labels(
-    unsigned int globalIndex,
-    vecmem::data::vector_view<std::size_t> cell_to_module_view,
-    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view);
-
 /// Function that finds the clusters using sparse_ccl algorithm
 ///
 /// It saves the cluster indices for each module in a jagged vector
@@ -50,31 +39,6 @@ void find_clusters(
     vecmem::data::jagged_vector_view<unsigned int> sparse_ccl_indices_view,
     vecmem::data::vector_view<std::size_t> clusters_per_module_view);
 
-// overload the function with the cell parallelised one
-TRACCC_HOST_DEVICE
-void find_clusters_cell_parallel(
-    std::size_t globalIndex, const cell_container_types::const_view& cells_view,
-    vecmem::data::vector_view<std::size_t> cell_module_view,
-    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
-    vecmem::data::vector_view<std::size_t> clusters_per_module_view);
-
-// Same as the above, but doing the lookups before in .cu file
-TRACCC_HOST_DEVICE
-bool find_clusters_cell_parallel_passthrough(
-    std::size_t module_number, unsigned int cell_index,
-    const vecmem::device_vector<const traccc::cell>& cells,
-    vecmem::device_vector<unsigned int>& labels,
-    unsigned int& neighbour_index);
-
-// find a nearest neighbour above/left and write its label into
-// the current label.
-TRACCC_HOST_DEVICE
-void write_from_NN(unsigned int cell_index,
-                   const vecmem::device_vector<const traccc::cell>& cells,
-                   vecmem::device_vector<unsigned int>& labels);
-
-
 /// Function that sets up the labels for each cell. If a cell is a
 /// cluster origin cell, the nearest neighbour index is -1, and its label
 /// is not written yet. Needs atomic add in the following step.
@@ -92,19 +56,6 @@ TRACCC_HOST_DEVICE
 void hk_find(
     unsigned int cell_index, 
     vecmem::device_vector<unsigned int>& labels);
-
-template<typename val_t>
-TRACCC_HOST_DEVICE
-void write_value(val_t* old_val, val_t new_val) {
-    detail::write_value(old_val, new_val);
-}
-
-// function for setting cluster numbers to 1->N only, N distinct clusters
-TRACCC_HOST_DEVICE
-void normalise_cluster_numbers(
-    std::size_t module_number,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
-    vecmem::data::vector_view<std::size_t> clusters_per_module_view);
 
 }  // namespace traccc::device
 
