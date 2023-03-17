@@ -405,6 +405,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         cl_per_module_prefix_buff;
 
     if (parallelise_by_cell) {
+        threadsPerBlock = 64;
         // get the grid size for using all cells
         blocksPerGrid = (n_cells_total + threadsPerBlock - 1) / threadsPerBlock;
 
@@ -425,6 +426,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         printf("TIME TAKEN FOR HK CLUSTERISATION: %fs\n", clusterisation_time.count());
 
         // go back to module wide parallelisation
+        threadsPerBlock = 64;
         blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
         // kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
         //     cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
@@ -432,7 +434,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         
         // CUDA_ERROR_CHECK(cudaGetLastError());
         // CUDA_ERROR_CHECK(cudaDeviceSynchronize());
-
+        
         // normalise the output to have labels from just 1 -> N
         kernels::normalise_cluster_numbers<<<blocksPerGrid, threadsPerBlock>>>(
             cell_cluster_label_view, cl_per_module_prefix_view);
@@ -446,12 +448,12 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         
         printf("TIME TAKEN FOR LABEL NORMALISATION: %fs\n", normalisation_time.count());
 
-        kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
-            cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
-            false, false, 970);  // check for module 755 after clusterisation
+        // kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
+        //     cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
+        //     false, false, 970);  // check for module 755 after clusterisation
         
-        CUDA_ERROR_CHECK(cudaGetLastError());
-        CUDA_ERROR_CHECK(cudaDeviceSynchronize());
+        // CUDA_ERROR_CHECK(cudaGetLastError());
+        // CUDA_ERROR_CHECK(cudaDeviceSynchronize());
     }
     else {  // parallelise by module
         // Calculating grid size for cluster finding kernel
