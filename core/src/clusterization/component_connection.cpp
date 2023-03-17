@@ -29,8 +29,8 @@ component_connection::output_type component_connection::operator()(
         CCL_indices[i] = std::vector<unsigned int>(cells_per_module.size());
 
         // Run SparseCCL to fill CCL indices
-        num_clusters[i] = detail::hoshen_kopelman(i, cells_per_module, CCL_indices[i]);
-        //num_clusters[i] = detail::sparse_ccl(cells_per_module, CCL_indices[i]);
+        //num_clusters[i] = detail::hoshen_kopelman(i, cells_per_module, CCL_indices[i]);
+        num_clusters[i] = detail::sparse_ccl(cells_per_module, CCL_indices[i]);
     }
 
     // Get total number of clusters

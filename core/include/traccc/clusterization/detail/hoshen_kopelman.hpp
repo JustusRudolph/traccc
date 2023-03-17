@@ -120,9 +120,7 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
                                                        const cell_container_t& cells,
                                                        label_vector& labels) {
     // first specify if we want to print debug messages throughout
-    bool print_debug = false; //globalIndex == 2409;   
-    bool include_diagonals = true;  // change this to get graph for output
-                                    // where HK only takes nns into account                                                  
+    bool print_debug = false; //globalIndex == 2409;                                             
     // The number of cells.
     const unsigned int n_cells = cells.size();
 
@@ -133,6 +131,7 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
     // naive search for left and above O(n)
     for (unsigned int i = 0; i < n_cells; i++) {
         traccc::cell curr_cell = cells[i];
+        unsigned int curr_label = labels[i];
         unsigned int left_label = 0;
         unsigned int above_label = 0;
         unsigned int diagonal_above_label = 0;
@@ -141,23 +140,26 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
                    i, i+1, curr_cell.channel0, curr_cell.channel1);
         }
         
-        // only check the cells that haven't been checked yet
-        for (unsigned int j = 0; j < n_cells; j++) {
+        // go backwards from current since left/above is before (sorted array)
+        for (unsigned int j = 1; j <= i; j++) {
+            unsigned int idx = i - j;
             // if one above and on left has been found, break out
             if (left_label * above_label > 0) { break;}
+            else if (is_far_enough2(curr_cell, cells[idx])) { break; }
 
-            if (is_left(cells[j], curr_cell)) {
-                left_label = labels[j];
+            if (is_left(cells[idx], curr_cell)) {
+                left_label = labels[idx];
                 continue;
             }
-            else if (is_above(cells[j], curr_cell)) {
-                above_label = labels[j];
+            else if (is_above(cells[idx], curr_cell)) {
+                above_label = labels[idx];
                 continue;
             }
             // following assumes no double diagonal without above set too
-            else if (is_diagonal_above(cells[j], curr_cell)) {
-                diagonal_above_label = labels[j];
-            }
+            // else if (is_diagonal_above(cells[idx], curr_cell)) {
+            //     diagonal_above_label = labels[idx];
+            //     //continue;
+            // }
         }
         if (print_debug) {
             printf("Above label: %d, left label: %d\n", above_label, left_label);
@@ -165,40 +167,43 @@ TRACCC_HOST_DEVICE inline unsigned int hoshen_kopelman(std::size_t globalIndex,
         // now choose what to do with current cell label
         if (left_label * above_label > 0) {
             // make union
-            for (unsigned int j = 0; j < n_cells; j++) {
+            for (unsigned int j = 0; j <= i; j++) {
                 // overwrite all labels left and the connected labels to curr cell
-                if (labels[j] == left_label || labels[j] == labels[i]) {
+                if (labels[j] == left_label || labels[j] == curr_label) {
                     labels[j] = above_label;
                 }
             }
         }
         else if (left_label > 0) {
             // set all with current label to left
-            for (unsigned int j = 0; j < n_cells; j++) {
-                // overwrite all cells with current label to the one left
-                if (labels[j] == labels[i]) {
-                    labels[j] = left_label;
-                }
-            }
+            // for (unsigned int j = 0; j <= i; j++) {
+            //     // overwrite all cells with current label to the one left
+            //     if (labels[j] == curr_label) {
+            //         labels[j] = left_label;
+            //     }
+            // }
+            labels[i] = left_label;
         }
         else if (above_label > 0) {
             // set all with current label to above
-            for (unsigned int j = 0; j < n_cells; j++) {
-                // overwrite all cells with current label to the one above
-                if (labels[j] == labels[i]) {
-                    labels[j] = above_label;
-                }
-            }
+            // for (unsigned int j = 0; j <= i; j++) {
+            //     // overwrite all cells with current label to the one above
+            //     if (labels[j] == curr_label) {
+            //         labels[j] = above_label;
+            //     }
+            // }
+            labels[i] = above_label;
         }
-        else if (diagonal_above_label > 0 && include_diagonals) {
-            // in case nothing next to, check the diagonals
-            for (unsigned int j = 0; j < n_cells; j++) {
-                // overwrite all cells with current label to the one diagonally above
-                if (labels[j] == labels[i]) {
-                    labels[j] = diagonal_above_label;
-                }
-            }
-        }
+        // else if (diagonal_above_label > 0) {
+        //     // in case nothing next to, check the diagonals
+        //     // for (unsigned int j = 0; j <= i; j++) {
+        //     //     // overwrite all cells with current label to the one diagonally above
+        //     //     if (labels[j] == curr_label) {
+        //     //         labels[j] = diagonal_above_label;
+        //     //     }
+        //     // }
+        //     labels[i] = diagonal_above_label;
+        // }
         if (print_debug) {
             printf("Following H-K: labels of the cells are: [");
             for (unsigned int j = 0; j < n_cells; j++) {

@@ -55,65 +55,65 @@ __global__ void find_clusters(
     vecmem::device_vector<std::size_t> device_clusters_per_module(
         clusters_per_module_view);
 
-    bool check_all = false;
-    // pick the below module because it has many activated cells
-    // 755 has the most cells, 2464 has exactly one cluster with the most cells (5)
-    int module_to_check = 755;  // module number that is being probed if above false
+    // bool check_all = false;
+    // // pick the below module because it has many activated cells
+    // // 755 has the most cells, 2464 has exactly one cluster with the most cells (5)
+    // int module_to_check = 755;  // module number that is being probed if above false
 
-    // if all modules are to be checked, then check if index is in range
-    // otherwise, check only if index is right
-    bool check = (check_all && (idx < cells_device.size())) || (idx == module_to_check);
-    if (check) {
-        // first print the cells for this module
-        const vecmem::device_vector<const traccc::cell>& cells =
-            cells_device.at(idx).items;
-        const traccc::cell_module cells_header = cells_device.at(idx).header;
-        size_t n_cells = cells.size();
+    // // if all modules are to be checked, then check if index is in range
+    // // otherwise, check only if index is right
+    // bool check = (check_all && (idx < cells_device.size())) || (idx == module_to_check);
+    // if (check) {
+    //     // first print the cells for this module
+    //     const vecmem::device_vector<const traccc::cell>& cells =
+    //         cells_device.at(idx).items;
+    //     const traccc::cell_module cells_header = cells_device.at(idx).header;
+    //     size_t n_cells = cells.size();
 
-        // TODO figure out what "module" means here
-        printf("cells_header: id: %d, module: %d range0: (%d, %d), range1: (%d, %d)\n",
-               (int) cells_header.event, (int) cells_header.module, 
-               (int) cells_header.range0[0], (int) cells_header.range0[1],
-               (int) cells_header.range1[0], (int) cells_header.range1[1]);
+    //     // TODO figure out what "module" means here
+    //     printf("cells_header: id: %d, module: %d range0: (%d, %d), range1: (%d, %d)\n",
+    //            (int) cells_header.event, (int) cells_header.module, 
+    //            (int) cells_header.range0[0], (int) cells_header.range0[1],
+    //            (int) cells_header.range1[0], (int) cells_header.range1[1]);
 
-        for (int i=0; i < n_cells; i++) {
-            const traccc::cell cell = cells[i];
-            scalar act = cell.activation;
-            printf("Idx: %d, i.e. (%d, %d): Cell index %d and position: (%d, %d) activation: %f\n",
-                    idx, blockIdx.x, threadIdx.x, i, cell.channel0, cell.channel1, act);
+    //     for (int i=0; i < n_cells; i++) {
+    //         const traccc::cell cell = cells[i];
+    //         scalar act = cell.activation;
+    //         printf("Idx: %d, i.e. (%d, %d): Cell index %d and position: (%d, %d) activation: %f\n",
+    //                 idx, blockIdx.x, threadIdx.x, i, cell.channel0, cell.channel1, act);
 
-        }
-        // then print the inputs/outputs that go into the actual algorithm
+    //     }
+    //     // then print the inputs/outputs that go into the actual algorithm
 
-        // THE BELOW IS COMMENTED BECAUSE IT'S NOT REALLY NECESSARY, ALL CELLS ARE ALLOCATED
-        // TO CLUSTER NUMBER 0 AT INITIALISATION
+    //     // THE BELOW IS COMMENTED BECAUSE IT'S NOT REALLY NECESSARY, ALL CELLS ARE ALLOCATED
+    //     // TO CLUSTER NUMBER 0 AT INITIALISATION
 
-        // unsigned int n_sparse_ccl_indices = device_sparse_ccl_indices.at(idx).size();
-        // for (int i=0; i < n_sparse_ccl_indices; i++) {
-        //     unsigned int cell_cluster_number = device_sparse_ccl_indices.at(idx).at(i);
-        //     printf("Before: Idx: %d, Clusters in module: %d, Cell %d belongs to cluster %d\n",
-        //         idx, (int) device_clusters_per_module.at(idx), i, cell_cluster_number);
-        // }
+    //     // unsigned int n_sparse_ccl_indices = device_sparse_ccl_indices.at(idx).size();
+    //     // for (int i=0; i < n_sparse_ccl_indices; i++) {
+    //     //     unsigned int cell_cluster_number = device_sparse_ccl_indices.at(idx).at(i);
+    //     //     printf("Before: Idx: %d, Clusters in module: %d, Cell %d belongs to cluster %d\n",
+    //     //         idx, (int) device_clusters_per_module.at(idx), i, cell_cluster_number);
+    //     // }
 
-        printf("Before: Idx: %d, Clusters in module: %d. All cells are in cluster 0.\n",
-            idx, (int) device_clusters_per_module.at(idx));
-    }
+    //     printf("Before: Idx: %d, Clusters in module: %d. All cells are in cluster 0.\n",
+    //         idx, (int) device_clusters_per_module.at(idx));
+    // }
     
 
     device::find_clusters(threadIdx.x + blockIdx.x * blockDim.x, cells_view,
                           sparse_ccl_indices_view, clusters_per_module_view);
 
     //printf("Finished, %d\n", (int) check);
-    if (check) {
-        unsigned int n_sparse_ccl_indices = device_sparse_ccl_indices.at(idx).size();
-        //printf("n_sparse_ccl_indices: %u\n", n_sparse_ccl_indices);
-        // print outputs from clusterisation algo
-        for (int i=0; i < n_sparse_ccl_indices; i++) {
-            unsigned int cell_cluster_number = device_sparse_ccl_indices.at(idx).at(i);
-            printf("After: Idx: %d, Clusters in module: %d, Cell %d belongs to cluster %d\n",
-                idx, (int) device_clusters_per_module.at(idx), i, cell_cluster_number);
-        }
-    }
+    // if (check) {
+    //     unsigned int n_sparse_ccl_indices = device_sparse_ccl_indices.at(idx).size();
+    //     //printf("n_sparse_ccl_indices: %u\n", n_sparse_ccl_indices);
+    //     // print outputs from clusterisation algo
+    //     for (int i=0; i < n_sparse_ccl_indices; i++) {
+    //         unsigned int cell_cluster_number = device_sparse_ccl_indices.at(idx).at(i);
+    //         printf("After: Idx: %d, Clusters in module: %d, Cell %d belongs to cluster %d\n",
+    //             idx, (int) device_clusters_per_module.at(idx), i, cell_cluster_number);
+    //     }
+    // }
     // if (device_clusters_per_module.at(idx) == 2) {
     //     printf("Module with two clusters: %d. Number of cells: %d\n",
     //            idx, cells_device.at(idx).items.size());
@@ -263,9 +263,13 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     vecmem::data::vector_view<std::size_t> cl_per_module_prefix_view =
         cl_per_module_prefix_buff;
 
+
+    threadsPerBlock = 64;  // line to change for experiments
     // Calculating grid size for cluster finding kernel
     std::size_t blocksPerGrid =
         (num_modules + threadsPerBlock - 1) / threadsPerBlock;
+
+    auto start_clusterisation_time = std::chrono::system_clock::now();
 
     // Invoke find clusters that will call cluster finding kernel
     kernels::find_clusters<<<blocksPerGrid, threadsPerBlock>>>(
@@ -274,6 +278,12 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     CUDA_ERROR_CHECK(cudaGetLastError());
     CUDA_ERROR_CHECK(cudaDeviceSynchronize());
 
+    auto end_clusterisation_time = std::chrono::system_clock::now();
+    std::chrono::duration<double> clusterisation_time =
+        end_clusterisation_time - start_clusterisation_time;
+
+    printf("TIME TAKEN FOR HK CLUSTERISATION: %fs\n", clusterisation_time.count());
+    threadsPerBlock = 64;  // set back
     // Create prefix sum buffer
     vecmem::data::vector_buffer cells_prefix_sum_buff =
         make_prefix_sum_buff(cell_sizes, *m_copy, m_mr);

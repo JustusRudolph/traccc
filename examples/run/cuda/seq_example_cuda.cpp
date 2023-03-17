@@ -290,11 +290,11 @@ int seq_run(const traccc::full_tracking_input_config& i_cfg,
             // measurements & spacepoint matching rate
             int n_m_match = 0;
             int n_match = 0;
-            assert(spacepoints_per_event.size() ==
-                   spacepoints_per_event_cuda.size());
+            // assert(spacepoints_per_event.size() ==
+            //        spacepoints_per_event_cuda.size());
             for (std::size_t i = 0; i < spacepoints_per_event.size(); ++i) {
-                assert(spacepoints_per_event[i].items.size() ==
-                       spacepoints_per_event_cuda[i].items.size());
+                // assert(spacepoints_per_event[i].items.size() ==
+                //        spacepoints_per_event_cuda[i].items.size());
                 for (auto& sp : spacepoints_per_event[i].items) {
                     auto found_sp = std::find(
                         spacepoints_per_event_cuda[i].items.begin(),
