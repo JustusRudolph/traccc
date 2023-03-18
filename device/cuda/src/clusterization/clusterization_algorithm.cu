@@ -405,7 +405,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         cl_per_module_prefix_buff;
 
     if (parallelise_by_cell) {
-        threadsPerBlock = 64;
+        threadsPerBlock = 320;
         // get the grid size for using all cells
         blocksPerGrid = (n_cells_total + threadsPerBlock - 1) / threadsPerBlock;
 

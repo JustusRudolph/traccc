@@ -322,7 +322,7 @@ bool hoshen_kopelman(std::size_t module_number, unsigned int cell_index,
             traccc::cell nn_cell = cells[nn_index];  // potential neighbour
 
             int row_diff = cell.channel1 - nn_cell.channel1;
-            if (row_diff >= 2) { break;}  // outside of bounds
+            if (row_diff > 1) { break;}  // outside of bounds
             
             int col_diff = cell.channel0 - nn_cell.channel0;
             

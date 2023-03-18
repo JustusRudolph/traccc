@@ -183,6 +183,8 @@ int seq_run(const traccc::full_tracking_input_config& i_cfg,
                 std::chrono::system_clock::now();
             /*time*/ std::chrono::duration<double> time_clusterization_cpu =
                 end_clusterization_cpu - start_clusterization_cpu;
+            std::cout << "TIME TAKEN FOR CCL CLUSTERISATION CPU: " <<
+                time_clusterization_cpu.count() << "s" << std::endl;
             /*time*/ clusterization_cpu += time_clusterization_cpu.count();
 
             /*---------------------------------
