@@ -424,22 +424,15 @@ void write_from_NN(unsigned int cell_index, const cell_container_t& cells,
         // since it's sorted, this is necessarily positive
         unsigned int row_diff = cell.channel1 - cell_to_check.channel1;
         
-        if (row_diff <= 1) {  // within reasonable territory
-            unsigned int col_diff = cell.channel0 - cell_to_check.channel0;
-            if (col_diff * col_diff <= 1) {  // within one cell
-                // have found a neighbour that is above/left, write its label
-                labels[cell_index] = labels[index_to_check];
-                //break;
-            }
-            else {
-                continue;  // move to next cell if this cell is not a NN above/left
-            }
-        }
-        else {
-            break;  // if outside range, there will be no more found
+        if (row_diff > 1) { break;}  // out of bounds
+
+        unsigned int col_diff = cell.channel0 - cell_to_check.channel0;
+        if (col_diff * col_diff <= 1) {  // within one cell
+            // have found a neighbour that is above/left, write its label
+            labels[cell_index] = labels[index_to_check];
+            //break;
         }
     }
-
 }
 
 /// Simple helper function to set the initial cluster labels
