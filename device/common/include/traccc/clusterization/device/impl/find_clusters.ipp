@@ -54,11 +54,11 @@ unsigned int setup_cluster_labels_and_NN(
 }
 
 TRACCC_HOST_DEVICE
-void hk_find(unsigned int cell_index,
+void fconn_find(unsigned int cell_index,
             vecmem::device_vector<unsigned int>& labels) {
 
     // pass the data through and overwrite relevant label
-    detail::hk_find(cell_index, labels);
+    detail::fconn_find(cell_index, labels);
 }
 
 }  // namespace traccc::device

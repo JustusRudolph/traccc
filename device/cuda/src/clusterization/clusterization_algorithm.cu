@@ -82,21 +82,19 @@ __global__ void find_clusters_cell_parallel(
         device::setup_cluster_labels_and_NN(cell_index, cells, cluster_labels);
 
     if (NN_index == cells.size()) {
-        //printf("Found an origin cell!\n");
         // we have hit an origin label, set it
         std::size_t* cluster_size = &device_clusters_per_module[module_number];
+        // need to case, atomicAdd not overloaded for size_t
         unsigned int* cluster_size_uint = (unsigned int*) cluster_size;
         unsigned int cluster_label = atomicAdd(cluster_size_uint, 1) + 1;
-        // device::write_value(&cluster_labels[cell_index], cluster_label);
+        
         cluster_labels[cell_index] = cluster_label;
     }
 
-    // first write NN value into current
-    //device::write_from_NN(cell_index, cells, cluster_labels);
     // ensure all cells have found their NN before continuing:
     __syncthreads();
     // lastly, look through the labels and assign iteratively
-    device::hk_find(cell_index, cluster_labels);
+    device::fconn_find(cell_index, cluster_labels);
 }
 
 
@@ -111,94 +109,6 @@ __global__ void find_clusters(
                           clusters_per_module_view);
 }
 
-
-__global__ void print_debug_module(
-    const cell_container_types::const_view cells_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
-    vecmem::data::vector_view<std::size_t> clusters_per_module_view,
-    bool check_all, bool before_clust, unsigned int module_to_check) {
-    /*
-     * This is a debug function which prints information about the current
-     * module. Current module is the global threadIdx.
-     */
-
-    cell_container_types::const_device cells_device(cells_view);
-    vecmem::jagged_device_vector<unsigned int> device_cell_cluster_label(
-        cell_cluster_label_view);
-    vecmem::device_vector<std::size_t> device_clusters_per_module(
-        clusters_per_module_view);
-
-    // 755 has the most cells
-    // 2464 has exactly one cluster with the most cells (5)
-    // module_to_check = 755;
-    
-    int module_number = threadIdx.x + blockIdx.x * blockDim.x;
-    // if all modules are to be checked, then check if index is in range
-    // otherwise, check only if index is right
-    bool check = (check_all && (module_number < cells_device.size())) ||
-                 (module_number == module_to_check);
-    if (check && before_clust) {
-        // first print the cells for this module
-        const vecmem::device_vector<const traccc::cell>& cells =
-            cells_device.at(module_number).items;
-        const traccc::cell_module cells_header =
-            cells_device.at(module_number).header;
-        size_t n_cells = cells.size();
-
-        // TODO figure out what "module" means here
-        printf("cells_header: id: %d, module: %d range0: (%d, %d), range1: (%d, %d)\n",
-               (int) cells_header.event, (int) cells_header.module, 
-               (int) cells_header.range0[0], (int) cells_header.range0[1],
-               (int) cells_header.range1[0], (int) cells_header.range1[1]);
-
-        for (int i=0; i < n_cells; i++) {
-            const traccc::cell cell = cells[i];
-            scalar act = cell.activation;
-            printf("Idx: %d, i.e. (%d, %d): Cell index %d and position: (%d, %d) activation: %f\n",
-                    module_number, blockIdx.x, threadIdx.x, i, cell.channel0, cell.channel1, act);
-
-        }
-        // then print the inputs/outputs that go into the actual algorithm
-
-        // THE BELOW IS COMMENTED BECAUSE IT'S NOT REALLY NECESSARY, ALL CELLS ARE ALLOCATED
-        // TO CLUSTER NUMBER 0 AT INITIALISATION
-
-        // unsigned int n_cell_cluster_label = device_cell_cluster_label.at(idx).size();
-        // for (int i=0; i < n_cell_cluster_label; i++) {
-        //     unsigned int cell_cluster_number = device_cell_cluster_label.at(idx).at(i);
-        //     printf("Before: Idx: %d, Clusters in module: %d, Cell %d belongs to cluster %d\n",
-        //         idx, (int) device_clusters_per_module.at(idx), i, cell_cluster_number);
-        // }
-
-        printf("Before: Idx: %d, Clusters in module: %d. All cells are in cluster 0.\n",
-            module_number, (int) device_clusters_per_module.at(module_number));
-    }
-
-    if (check && !before_clust) {
-        const vecmem::device_vector<const traccc::cell>& cells =
-            cells_device.at(module_number).items;
-        unsigned int n_cell_cluster_label =
-            device_cell_cluster_label.at(module_number).size();
-        //printf("n_cell_cluster_label: %u\n", n_cell_cluster_label);
-        // print outputs from clusterisation algo
-        // printf("After: %d clusters in module %d.\n",
-        //        (int) device_clusters_per_module.at(module_number), (int) module_number);
-
-        for (int i=0; i < n_cell_cluster_label; i++) {
-            const traccc::cell cell = cells[i];
-            unsigned int cell_cluster_number =
-                device_cell_cluster_label.at(module_number).at(i);
-            printf("After: Module: %d, Clusters in module: %d, Cell %d, Point (%d, %d) belongs to cluster %d. Activation: %f\n",
-                module_number, (int) device_clusters_per_module.at(module_number), i, cell.channel0,
-                cell.channel1, cell_cluster_number, cell.activation);
-        }
-    }
-    // if (device_clusters_per_module.at(idx) == 2) {
-    //     printf("Module with two clusters: %d. Number of cells: %d\n",
-    //            idx, cells_device.at(idx).items.size());
-    // }
-    //printf("Module %d has %d clusters\n.", idx, device_clusters_per_module.at(idx));
-}
 
 __global__ void count_cluster_cells(
     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
@@ -265,15 +175,13 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     // Vecmem copy object for moving the data between host and device
     vecmem::copy copy;
 
-    printf("Starting CUDA clusterization.\n");
     // Number of modules
     unsigned int num_modules = cells_per_event.size();
-    printf("Number of modules: %d\n", num_modules);
 
     // Work block size for kernel execution
     std::size_t threadsPerBlock = 64;
     std::size_t blocksPerGrid;  // initialise, will change dep. on kernel
-    // for debug: Choose which level of parallelisation
+    // Choose which level of parallelisation, TODO: Make flag
     bool parallelise_by_cell = true;
 
     // Get the view of the cells container
@@ -283,12 +191,13 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     
     // Get the sizes of the cells in each module
     auto cell_sizes = copy.get_sizes(cells_data.items);
-
-    auto start_clusterisation_setup_time = std::chrono::system_clock::now();
-    unsigned int n_cells_total = 0;
-    for (unsigned int i = 0; i < cell_sizes.size(); i++) {
+    
+    // create the mapping arrays
+    unsigned int n_cells_total = cell_sizes[0];
+    for (unsigned int i = 1; i < cell_sizes.size(); i++) {
         n_cells_total += cell_sizes[i];
     }
+
     // create a vector which maps the cell index to current module
     vecmem::vector<std::size_t> cell_to_module(n_cells_total);
     vecmem::vector<std::size_t> cell_indices_in_module(n_cells_total);
@@ -301,13 +210,6 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
             curr_idx++;
         }
     }
-    
-    auto end_clusterisation_setup_time = std::chrono::system_clock::now();
-
-    std::chrono::duration<double> clusterisation_setup_time =
-        end_clusterisation_setup_time - start_clusterisation_setup_time;
-    
-    printf("TIME TAKEN FOR HK SETUP: %fs\n", clusterisation_setup_time.count());
 
     // instantiate vector buffers to hold the above data
     vecmem::data::vector_buffer<std::size_t> cell_to_module_buff(
@@ -384,10 +286,9 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
     if (parallelise_by_cell) {
         // get the grid size for using all cells
-        threadsPerBlock = 64;
+        threadsPerBlock = 1024;
         blocksPerGrid = (n_cells_total + threadsPerBlock - 1) / threadsPerBlock;
 
-        auto start_clusterisation_time = std::chrono::system_clock::now();
         // Run cell parallelised kernel to get clusters
         kernels::find_clusters_cell_parallel<<<blocksPerGrid, threadsPerBlock>>>(
             cells_view, cell_to_module_view, cell_indices_in_mod_view,
@@ -395,14 +296,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
         CUDA_ERROR_CHECK(cudaGetLastError());
         CUDA_ERROR_CHECK(cudaDeviceSynchronize());
-
-        auto end_clusterisation_time = std::chrono::system_clock::now();
-
-        std::chrono::duration<double> clusterisation_time =
-            end_clusterisation_time - start_clusterisation_time;
         
-        printf("TIME TAKEN FOR HK CLUSTERISATION: %fs\n", clusterisation_time.count());
-
         // go back to module wide parallelisation
         threadsPerBlock = 64;
     }
@@ -410,24 +304,9 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         // Calculating grid size for cluster finding kernel
         blocksPerGrid = (num_modules + threadsPerBlock - 1) / threadsPerBlock;
 
-        auto start_clusterisation_time = std::chrono::system_clock::now();
         // Invoke find clusters that will call cluster finding kernel
         kernels::find_clusters<<<blocksPerGrid, threadsPerBlock>>>(
             cells_view, cell_cluster_label_view, cl_per_module_prefix_view);
-
-        CUDA_ERROR_CHECK(cudaGetLastError());
-        CUDA_ERROR_CHECK(cudaDeviceSynchronize());
-
-        auto end_clusterisation_time = std::chrono::system_clock::now();
-
-        std::chrono::duration<double> clusterisation_time =
-            end_clusterisation_time - start_clusterisation_time;
-        
-        printf("TIME TAKEN FOR CCL CLUSTERISATION: %fs\n", clusterisation_time.count());
-        
-        // kernels::print_debug_module<<<blocksPerGrid, threadsPerBlock>>>(
-        //     cells_view, cell_cluster_label_view, cl_per_module_prefix_view,
-        //     false, false, 755);  // check for module 755 after clusterisation
         
         CUDA_ERROR_CHECK(cudaGetLastError());
         CUDA_ERROR_CHECK(cudaDeviceSynchronize());

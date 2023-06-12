@@ -30,9 +30,10 @@ namespace detail {
 /// @param labels is the vector of the output indices (to which cluster a cell
 ///               belongs to)
 /// 
+template <typename label_vector>
 TRACCC_HOST_DEVICE
-inline void hk_find(unsigned int cell_index,
-                    vecmem::device_vector<unsigned int>& labels) {
+inline void fconn_find(unsigned int cell_index,
+                    label_vector& labels) {
     
     unsigned int curr_index = cell_index;
     unsigned int n_cells = labels.size();
@@ -50,8 +51,8 @@ inline void hk_find(unsigned int cell_index,
 ///
 /// @param cell_index is the index of the current cell in the cell collection
 /// @param cells is the cell collection. Sorted by column
-/// @param labels is the vector which contains which cluster a cell
-///               belongs to
+/// @param labels is the vector which contains which cluster a cell belongs to
+///
 template <typename cell_container_t, typename label_vector>
 TRACCC_HOST_DEVICE
 unsigned int setup_cluster_labels_and_NN(
@@ -63,7 +64,7 @@ unsigned int setup_cluster_labels_and_NN(
 
     // will be overwritten as less if we find a neighbour
     unsigned int NN_index = n_cells;
- 
+
     // check all cells in the module from current cell to the start
     for (unsigned int i = 1; i <= cell_index; i++) {
         // if one neighbour has been found, break out

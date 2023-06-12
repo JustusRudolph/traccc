@@ -9,7 +9,7 @@
 
 // Project include(s).
 #include "traccc/clusterization/detail/sparse_ccl.hpp"
-#include "traccc/clusterization/detail/hoshen_kopelman.hpp"
+#include "traccc/clusterization/detail/fconn.hpp"
 #include "traccc/definitions/qualifiers.hpp"
 #include "traccc/edm/cell.hpp"
 
@@ -53,7 +53,7 @@ unsigned int setup_cluster_labels_and_NN(
 // find the origin of the cluster for each cell, implementation
 // of find() part of a union-find clusterisation algorithm
 TRACCC_HOST_DEVICE
-void hk_find(
+void fconn_find(
     unsigned int cell_index, 
     vecmem::device_vector<unsigned int>& labels);
 
