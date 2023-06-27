@@ -13,7 +13,7 @@
 namespace traccc::device {
 
 TRACCC_DEVICE
-void populate_grid(
+inline void populate_grid(
     std::size_t globalIndex, const seedfinder_config& config,
     const spacepoint_container_types::const_view& spacepoints_view,
     const vecmem::data::vector_view<const prefix_sum_element_t>&
@@ -34,7 +34,7 @@ void populate_grid(
     const spacepoint sp = spacepoints.at({sp_idx.first, sp_idx.second});
 
     /// Check out if the spacepoint can be used for seeding.
-    if (is_valid_sp(config, sp) != detray::invalid_value<size_t>()) {
+    if (is_valid_sp(config, sp) != detray::detail::invalid_value<size_t>()) {
 
         // Set up the spacepoint grid object(s).
         sp_grid_device grid(grid_view);

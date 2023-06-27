@@ -41,6 +41,13 @@ struct triplet_counter {
     /// The number of compatible triplets for a the midbot doublet
     unsigned int m_nTriplets = 0;
 
+    /// The position of the middle top doublets with this spM
+    unsigned int m_mt_start_idx = 0;
+    unsigned int m_mt_end_idx;
+
+    /// The position in which these triplets will be added
+    unsigned int posTriplets = 0;
+
 };  // struct triplet_counter
 
 /// Declare all triplet counter collection types

@@ -22,6 +22,10 @@ struct doublet {
     sp_location sp1;
     // bottom (or top) spacepoint location in internal spacepoint container
     sp_location sp2;
+
+    // Position of the mid top doublets for this which share this spM
+    unsigned int m_mt_start_idx = 0;
+    unsigned int m_mt_end_idx = 0;
 };
 
 inline TRACCC_HOST_DEVICE bool operator==(const doublet& lhs,
@@ -32,33 +36,10 @@ inline TRACCC_HOST_DEVICE bool operator==(const doublet& lhs,
             lhs.sp2.sp_idx == rhs.sp2.sp_idx);
 }
 
-/// Container of doublet belonging to one detector module
-template <template <typename> class vector_t>
-using doublet_collection = vector_t<doublet>;
+/// Declare all doublet collection types
+using doublet_collection_types = collection_types<doublet>;
 
-/// Convenience declaration for the doublet collection type to use in host code
-using host_doublet_collection = doublet_collection<vecmem::vector>;
-
-/// Convenience declaration for the doublet collection type to use in device
-/// code
-using device_doublet_collection = doublet_collection<vecmem::device_vector>;
-
-/// Convenience declaration for the doublet container type to use in host code
-using host_doublet_container = host_container<doublet_per_bin, doublet>;
-
-/// Convenience declaration for the doublet container type to use in device code
-using device_doublet_container = device_container<doublet_per_bin, doublet>;
-
-/// Convenience declaration for the doublet container data type to use in host
-/// code
-using doublet_container_data = container_data<doublet_per_bin, doublet>;
-
-/// Convenience declaration for the doublet container buffer type to use in host
-/// code
-using doublet_container_buffer = container_buffer<doublet_per_bin, doublet>;
-
-/// Convenience declaration for the doublet container view type to use in host
-/// code
-using doublet_container_view = container_view<doublet_per_bin, doublet>;
+/// Declare all doublet container types
+using doublet_container_types = container_types<doublet_per_bin, doublet>;
 
 }  // namespace traccc

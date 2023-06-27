@@ -13,12 +13,12 @@
 namespace traccc::device {
 
 TRACCC_HOST_DEVICE
-void update_triplet_weights(
+inline void update_triplet_weights(
     const std::size_t globalIndex, const seedfilter_config& filter_config,
     const sp_grid_const_view& sp_view,
     const vecmem::data::vector_view<const prefix_sum_element_t>&
         triplet_ps_view,
-    scalar* data, triplet_container_view triplet_view) {
+    scalar* data, triplet_container_types::view triplet_view) {
 
     // Check if anything needs to be done.
     const vecmem::device_vector<const prefix_sum_element_t> triplet_prefix_sum(
@@ -33,7 +33,7 @@ void update_triplet_weights(
     const prefix_sum_element_t ps_idx = triplet_prefix_sum[globalIndex];
     const unsigned int bin_idx = ps_idx.first;
 
-    device_triplet_container triplets(triplet_view);
+    triplet_container_types::device triplets(triplet_view);
     vecmem::device_vector<triplet> triplets_per_bin =
         triplets.get_items().at(bin_idx);
 
@@ -57,15 +57,14 @@ void update_triplet_weights(
     std::size_t num_compat_seedR = 0;
 
     // iterate over triplets
-    for (auto tr_it = triplets_per_bin.begin(); tr_it != triplets_per_bin.end();
-         tr_it++) {
-        // only use other triplets which share same midBot doublet
-        if (this_triplet == *tr_it || !(this_triplet.sp1 == tr_it->sp1) ||
-            !(this_triplet.sp2 == tr_it->sp2)) {
+    for (unsigned int i = this_triplet.triplets_mb_begin;
+         i < this_triplet.triplets_mb_end; ++i) {
+        // skip same triplet
+        if (i == ps_idx.second) {
             continue;
         }
 
-        const triplet& other_triplet = *tr_it;
+        const triplet& other_triplet = triplets_per_bin[i];
         const sp_location other_spT_idx = other_triplet.sp3;
         const traccc::internal_spacepoint<traccc::spacepoint> other_spT =
             sp_grid.bin(other_spT_idx.bin_idx)[other_spT_idx.sp_idx];

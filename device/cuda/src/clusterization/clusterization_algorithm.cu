@@ -312,10 +312,13 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
         CUDA_ERROR_CHECK(cudaDeviceSynchronize());
     }
 
-
     // Create prefix sum buffer
     vecmem::data::vector_buffer cells_prefix_sum_buff =
         make_prefix_sum_buff(cell_sizes, *m_copy, m_mr);
+
+    // Wait here for the find_clusters kernel to finish
+    CUDA_ERROR_CHECK(cudaGetLastError());
+    CUDA_ERROR_CHECK(cudaDeviceSynchronize());
 
     // Copy the sizes of clusters per module to the host
     // and create a copy of "clusters per module" vector
@@ -344,19 +347,14 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     m_copy->setup(cluster_sizes_buffer);
     m_copy->memset(cluster_sizes_buffer, 0);
 
-    // Create views to pass to cluster counting kernel
-    vecmem::data::vector_view<const device::prefix_sum_element_t>
-        cells_prefix_sum_view = cells_prefix_sum_buff;
-    vecmem::data::vector_view<unsigned int> cluster_sizes_view =
-        cluster_sizes_buffer;
-
     // Calclating grid size for cluster counting kernel (block size 64)
     blocksPerGrid =
-        (cells_prefix_sum_view.size() + threadsPerBlock - 1) / threadsPerBlock;
+        (cells_prefix_sum_buff.size() + threadsPerBlock - 1) / threadsPerBlock;
     // Invoke cluster counting will call count cluster cells kernel
     kernels::count_cluster_cells<<<blocksPerGrid, threadsPerBlock>>>(
         cell_cluster_label_view, cl_per_module_prefix_view,
         cells_prefix_sum_view, cluster_sizes_view);
+
     // Check for kernel launch errors and Wait for the cluster_counting kernel
     // to finish
     CUDA_ERROR_CHECK(cudaGetLastError());
@@ -375,9 +373,6 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
          m_mr.main, m_mr.host}};
     m_copy->setup(clusters_buffer.headers);
     m_copy->setup(clusters_buffer.items);
-
-    // Create views to pass to component connection kernel
-    cluster_container_types::view clusters_view = clusters_buffer;
 
     // Using previous block size and thread size (64)
     // Invoke connect components will call connect components kernel
@@ -404,16 +399,17 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     m_copy->setup(spacepoints_buffer.headers);
     m_copy->setup(spacepoints_buffer.items);
 
-    // Create views to pass to measurement creation kernel
-    measurement_container_types::view measurements_view = measurements_buffer;
-
     // Calculating grid size for measurements creation kernel (block size 64)
-    blocksPerGrid =
-        (clusters_view.headers.size() - 1 + threadsPerBlock) / threadsPerBlock;
+    blocksPerGrid = (clusters_buffer.headers.size() - 1 + threadsPerBlock) /
+                    threadsPerBlock;
+
+    // Wait here for the connect_components kernel to finish
+    CUDA_ERROR_CHECK(cudaGetLastError());
+    CUDA_ERROR_CHECK(cudaDeviceSynchronize());
 
     // Invoke measurements creation will call create measurements kernel
     kernels::create_measurements<<<blocksPerGrid, threadsPerBlock>>>(
-        cells_view, clusters_view, measurements_view);
+        cells_view, clusters_buffer, measurements_buffer);
 
     // Check for kernel launch errors and Wait here for the measurements
     // creation kernel to finish
@@ -424,15 +420,10 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
     vecmem::data::vector_buffer meas_prefix_sum_buff = make_prefix_sum_buff(
         m_copy->get_sizes(measurements_buffer.items), *m_copy, m_mr);
 
-    // Create views to run spacepoint formation
-    vecmem::data::vector_view<const device::prefix_sum_element_t>
-        meas_prefix_sum_view = meas_prefix_sum_buff;
-    spacepoint_container_types::view spacepoints_view = spacepoints_buffer;
-
     // Using the same grid size as before
     // Invoke spacepoint formation will call form_spacepoints kernel
     kernels::form_spacepoints<<<blocksPerGrid, threadsPerBlock>>>(
-        measurements_view, meas_prefix_sum_view, spacepoints_view);
+        measurements_buffer, meas_prefix_sum_buff, spacepoints_buffer);
     // Check for kernel launch errors and Wait for the spacepoint formation
     // kernel to finish
     CUDA_ERROR_CHECK(cudaGetLastError());
