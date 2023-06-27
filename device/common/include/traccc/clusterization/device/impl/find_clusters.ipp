@@ -32,12 +32,33 @@ inline void find_clusters(
 
     // Run the sparse CCL algorithm
     unsigned int n_clusters = detail::sparse_ccl(cells, cluster_indices);
+    // unsigned int n_clusters = detail::hoshen_kopelman(globalIndex, cells, cluster_indices);
 
-    // Fill the "number of clusters per
-    // module" vector
+    // Fill the "number of clusters per module" vector
     vecmem::device_vector<std::size_t> device_clusters_per_module(
         clusters_per_module_view);
     device_clusters_per_module[globalIndex] = n_clusters;
+}
+
+TRACCC_HOST_DEVICE
+unsigned int setup_cluster_labels_and_NN(
+    std::size_t cell_index,
+    const vecmem::device_vector<const traccc::cell>& cells,
+    vecmem::device_vector<unsigned int>& labels) {
+
+    // pass data through, set current label to unique identifier
+    unsigned int NN_index =
+        detail::setup_cluster_labels_and_NN(cell_index, cells, labels);
+
+    return NN_index;
+}
+
+TRACCC_HOST_DEVICE
+void fconn_find(unsigned int cell_index,
+            vecmem::device_vector<unsigned int>& labels) {
+
+    // pass the data through and overwrite relevant label
+    detail::fconn_find(cell_index, labels);
 }
 
 }  // namespace traccc::device

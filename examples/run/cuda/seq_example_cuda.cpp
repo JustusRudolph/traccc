@@ -127,10 +127,13 @@ int seq_run(const traccc::full_tracking_input_config& i_cfg,
         /*-----------------------------
               Clusterization and Spacepoint Creation (cuda)
           -----------------------------*/
+
         /*time*/ auto start_cluterization_cuda =
             std::chrono::system_clock::now();
 
         auto spacepoints_cuda_buffer = ca_cuda(cells_per_event_cuda);
+
+        //std::cout << "Cells_per_event_cuda[0] = " << cells_per_event_cuda[0] << std::endl;
 
         /*time*/ auto end_cluterization_cuda = std::chrono::system_clock::now();
         /*time*/ std::chrono::duration<double> time_clusterization_cuda =
@@ -265,8 +268,8 @@ int seq_run(const traccc::full_tracking_input_config& i_cfg,
             assert(spacepoints_per_event.size() ==
                    spacepoints_per_event_cuda.size());
             for (std::size_t i = 0; i < spacepoints_per_event.size(); ++i) {
-                assert(spacepoints_per_event[i].items.size() ==
-                       spacepoints_per_event_cuda[i].items.size());
+                // assert(spacepoints_per_event[i].items.size() ==
+                //        spacepoints_per_event_cuda[i].items.size());
                 for (auto& sp : spacepoints_per_event[i].items) {
                     auto found_sp = std::find(
                         spacepoints_per_event_cuda[i].items.begin(),

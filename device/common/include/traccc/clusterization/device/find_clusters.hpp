@@ -9,6 +9,7 @@
 
 // Project include(s).
 #include "traccc/clusterization/detail/sparse_ccl.hpp"
+#include "traccc/clusterization/detail/fconn.hpp"
 #include "traccc/definitions/qualifiers.hpp"
 #include "traccc/edm/cell.hpp"
 
@@ -20,7 +21,6 @@
 #include <cstddef>
 
 namespace traccc::device {
-
 /// Function that finds the clusters using sparse_ccl algorithm
 ///
 /// It saves the cluster indices for each module in a jagged vector
@@ -38,6 +38,24 @@ inline void find_clusters(
     std::size_t globalIndex, const cell_container_types::const_view& cells_view,
     vecmem::data::jagged_vector_view<unsigned int> sparse_ccl_indices_view,
     vecmem::data::vector_view<std::size_t> clusters_per_module_view);
+
+/// Function that sets up the labels for each cell. If a cell is a
+/// cluster origin cell, the nearest neighbour index is -1, and its label
+/// is not written yet. Needs atomic add in the following step.
+/// A cell with a neighbour above/left has its cluster label written
+/// as n_cells + neighbour_index + 1 to point to a neighbour distinctly
+TRACCC_HOST_DEVICE
+unsigned int setup_cluster_labels_and_NN(
+    std::size_t cell_index,
+    const vecmem::device_vector<const traccc::cell>& cells,
+    vecmem::device_vector<unsigned int>& labels);
+
+// find the origin of the cluster for each cell, implementation
+// of find() part of a union-find clusterisation algorithm
+TRACCC_HOST_DEVICE
+void fconn_find(
+    unsigned int cell_index, 
+    vecmem::device_vector<unsigned int>& labels);
 
 }  // namespace traccc::device
 
