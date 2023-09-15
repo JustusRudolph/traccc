@@ -19,7 +19,6 @@
 
 // System include(s).
 #include <functional>
-#include <iostream>
 
 namespace traccc {
 

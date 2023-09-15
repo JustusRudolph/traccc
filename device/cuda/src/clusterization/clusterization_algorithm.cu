@@ -36,70 +36,70 @@ static constexpr int MAX_CELLS_PER_THREAD = 12;
 
 namespace kernels {
 
-__global__ void find_clusters_cell_parallel(
-    const cell_container_types::const_view cells_view,
-    vecmem::data::vector_view<std::size_t> cell_to_module_view,
-    vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
-    vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
-    vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
-    /*
-     * this function is the same as find_clusters but instead of every module
-     * being a thread, every cell is a thread instead. Thus, it has an
-     * extra argument which makes it possible to map the current cell (idx) to
-     * the module it belongs to.
-     */
-    unsigned int thread_idx = threadIdx.x + blockIdx.x * blockDim.x;
+// __global__ void find_clusters_cell_parallel(
+//     const cell_container_types::const_view cells_view,
+//     vecmem::data::vector_view<std::size_t> cell_to_module_view,
+//     vecmem::data::vector_view<std::size_t> cell_indices_in_mod_view,
+//     vecmem::data::jagged_vector_view<unsigned int> cell_cluster_label_view,
+//     vecmem::data::vector_view<std::size_t> clusters_per_module_view) {
+//     /*
+//      * this function is the same as find_clusters but instead of every module
+//      * being a thread, every cell is a thread instead. Thus, it has an
+//      * extra argument which makes it possible to map the current cell (idx) to
+//      * the module it belongs to.
+//      */
+//     unsigned int thread_idx = threadIdx.x + blockIdx.x * blockDim.x;
     
-    // Initialize the device container for cells
-    cell_container_types::const_device cells_device(cells_view);
-    // Do the same with cell to module and cell index mapping
-    vecmem::device_vector<std::size_t> device_cell_to_module(
-        cell_to_module_view);
-    vecmem::device_vector<std::size_t> device_cell_indices_in_mod(
-        cell_indices_in_mod_view);
+//     // Initialize the device container for cells
+//     cell_container_types::const_device cells_device(cells_view);
+//     // Do the same with cell to module and cell index mapping
+//     vecmem::device_vector<std::size_t> device_cell_to_module(
+//         cell_to_module_view);
+//     vecmem::device_vector<std::size_t> device_cell_indices_in_mod(
+//         cell_indices_in_mod_view);
 
-    // Ignore if idx is out of range
-    if (thread_idx >= device_cell_to_module.size())
-        return;
+//     // Ignore if idx is out of range
+//     if (thread_idx >= device_cell_to_module.size())
+//         return;
 
-    // get the current module number from the current cell idx
-    std::size_t module_number = device_cell_to_module.at(thread_idx);
-    std::size_t cell_index = device_cell_indices_in_mod.at(thread_idx);
+//     // get the current module number from the current cell idx
+//     std::size_t module_number = device_cell_to_module.at(thread_idx);
+//     std::size_t cell_index = device_cell_indices_in_mod.at(thread_idx);
 
-    // Initialise the jagged device vector for cell cluster indices
-    // and the device vector for the number of clusters per module
-    vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
-        cell_cluster_label_view);
-    vecmem::device_vector<std::size_t> device_clusters_per_module(
-        clusters_per_module_view);
+//     // Initialise the jagged device vector for cell cluster indices
+//     // and the device vector for the number of clusters per module
+//     vecmem::jagged_device_vector<unsigned int> device_cell_cluster_labels(
+//         cell_cluster_label_view);
+//     vecmem::device_vector<std::size_t> device_clusters_per_module(
+//         clusters_per_module_view);
 
-    // Get the cells for the current module and the cell this thread
-    // is looking at
-    const vecmem::device_vector<const traccc::cell>& cells =
-        cells_device.at(module_number).items;
-    // Get the relevant labels, so the ones for this current module
-    vecmem::device_vector<unsigned int> cluster_labels = 
-        device_cell_cluster_labels[module_number];
+//     // Get the cells for the current module and the cell this thread
+//     // is looking at
+//     const vecmem::device_vector<const traccc::cell>& cells =
+//         cells_device.at(module_number).items;
+//     // Get the relevant labels, so the ones for this current module
+//     vecmem::device_vector<unsigned int> cluster_labels = 
+//         device_cell_cluster_labels[module_number];
     
-    // find nearest neighbour above/left and write into current
-    unsigned int NN_index =
-        device::setup_cluster_labels_and_NN(cell_index, cells, cluster_labels);
+//     // find nearest neighbour above/left and write into current
+//     unsigned int NN_index =
+//         device::setup_cluster_labels_and_NN(cell_index, cells, cluster_labels);
 
-    if (NN_index == cells.size()) {
-        // we have hit an origin label, set it
-        std::size_t* cluster_size = &device_clusters_per_module[module_number];
-        // need to case, atomicAdd not overloaded for size_t
-        unsigned int* cluster_size_uint = (unsigned int*) cluster_size;
-        unsigned int cluster_label = atomicAdd(cluster_size_uint, 1) + 1;
+//     if (NN_index == cells.size()) {
+//         // we have hit an origin label, set it
+//         std::size_t* cluster_size = &device_clusters_per_module[module_number];
+//         // need to case, atomicAdd not overloaded for size_t
+//         unsigned int* cluster_size_uint = (unsigned int*) cluster_size;
+//         unsigned int cluster_label = atomicAdd(cluster_size_uint, 1) + 1;
         
-        cluster_labels[cell_index] = cluster_label;
-    }
+//         cluster_labels[cell_index] = cluster_label;
+//     }
 
-    // ensure all cells have found their NN before continuing:
-    __syncthreads();
-    // lastly, look through the labels and assign iteratively
-    device::fconn_find(cell_index, cluster_labels);
-}
+//     // ensure all cells have found their NN before continuing:
+//     __syncthreads();
+//     // lastly, look through the labels and assign iteratively
+//     device::fconn_find(cell_index, cluster_labels);
+// }
 
 
 /// CUDA kernel for running @c traccc::device::ccl_kernel
