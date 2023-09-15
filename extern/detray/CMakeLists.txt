@@ -1,6 +1,6 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2021-2022 CERN for the benefit of the ACTS project
+# (c) 2021-2023 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
 
@@ -18,7 +18,7 @@ message( STATUS "Building Detray as part of the TRACCC project" )
 
 # Declare where to get Detray from.
 set( TRACCC_DETRAY_SOURCE
-   "URL;https://github.com/acts-project/detray/archive/refs/tags/v0.12.0.tar.gz;URL_MD5;77dae6fc8fa80edc2514cb26cad759a6"
+   "URL;https://github.com/acts-project/detray/archive/refs/tags/v0.40.0.tar.gz;URL_MD5;7a3bcd74049561b7d7e01b1436f47cf0"
    CACHE STRING "Source for Detray, when built as part of this project" )
 
 mark_as_advanced( TRACCC_DETRAY_SOURCE )
@@ -30,6 +30,8 @@ set( DETRAY_CUSTOM_SCALARTYPE "float" CACHE STRING
 
 set( DETRAY_BUILD_TESTING FALSE CACHE BOOL
    "Turn off the build of the Detray unit tests" )
+set( DETRAY_BUILD_TUTORIALS FALSE CACHE BOOL
+   "Turn off the build of the Detray tutorials" )   
 set( DETRAY_EIGEN_PLUGIN TRUE CACHE BOOL
    "Turn on the build of the Detray Eigen code" )
 set( DETRAY_VC_PLUGIN TRUE CACHE BOOL
@@ -47,6 +49,8 @@ set( DETRAY_SETUP_BENCHMARK FALSE CACHE BOOL
    "Do not set up Google Benchmark as part of Detray" )
 set( DETRAY_SETUP_THRUST FALSE CACHE BOOL
    "Do not set up Thrust as part of Detray" )
+set( DETRAY_SETUP_COVFIE FALSE CACHE BOOL
+   "Do not set up covfie as part of Detray" )
 
 # Get it into the current directory.
 FetchContent_MakeAvailable( Detray )

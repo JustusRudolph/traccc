@@ -28,35 +28,52 @@ namespace traccc::sycl {
 
 /// track parameter estimation for sycl
 struct track_params_estimation
-    : public algorithm<bound_track_parameters_collection_types::host(
-          const spacepoint_container_types::const_view&,
-          const seed_collection_types::const_view&)> {
+    : public algorithm<bound_track_parameters_collection_types::buffer(
+          const spacepoint_collection_types::const_view&,
+          const seed_collection_types::const_view&,
+          const cell_module_collection_types::const_view&, const vector3&,
+          const std::array<traccc::scalar, traccc::e_bound_size>&)> {
 
     public:
     /// Constructor for track_params_estimation
     ///
     /// @param mr       is a struct of memory resources (shared or
     /// host & device)
+    /// @param copy The copy object to use for copying data between device
+    ///             and host memory blocks
     /// @param queue    is a wrapper for the sycl queue for kernel
     /// invocation
     track_params_estimation(const traccc::memory_resource& mr,
-                            queue_wrapper queue);
+                            vecmem::copy& copy, queue_wrapper queue);
 
     /// Callable operator for track_params_esitmation
     ///
-    /// @param spaepoints_view   is the view of the spacepoint container
-    /// @param seeds_view        is the view of the seed container
-    /// @return                  vector of bound track parameters
+    /// @param spacepoints All spacepoints of the event
+    /// @param seeds The reconstructed track seeds of the event
+    /// @param modules Geometry module vector
+    /// @param bfield (Temporary) Magnetic field vector
+    /// @param stddev standard deviation for setting the covariance (Default
+    /// value from arXiv:2112.09470v1)
+    /// @return A vector of bound track parameters
     ///
-    bound_track_parameters_collection_types::host operator()(
-        const spacepoint_container_types::const_view& spacepoints_view,
-        const seed_collection_types::const_view& seeds_view) const override;
+    output_type operator()(
+        const spacepoint_collection_types::const_view& spacepoints_view,
+        const seed_collection_types::const_view& seeds_view,
+        const cell_module_collection_types::const_view& modules_view,
+        const vector3& bfield,
+        const std::array<traccc::scalar, traccc::e_bound_size>& stddev = {
+            0.02 * detray::unit<traccc::scalar>::mm,
+            0.03 * detray::unit<traccc::scalar>::mm,
+            1. * detray::unit<traccc::scalar>::degree,
+            1. * detray::unit<traccc::scalar>::degree,
+            0.01 / detray::unit<traccc::scalar>::GeV,
+            1 * detray::unit<traccc::scalar>::ns}) const override;
 
     private:
     // Private member variables
     traccc::memory_resource m_mr;
     mutable queue_wrapper m_queue;
-    std::unique_ptr<vecmem::copy> m_copy;
+    vecmem::copy& m_copy;
 };
 
 }  // namespace traccc::sycl

@@ -19,6 +19,7 @@
 
 // VecMem include(s).
 #include <vecmem/containers/data/vector_buffer.hpp>
+#include <vecmem/utils/copy.hpp>
 
 // traccc library include(s).
 #include "traccc/utils/memory_resource.hpp"
@@ -27,15 +28,20 @@ namespace traccc::sycl {
 
 /// Main algorithm for performing the track seeding using oneAPI/SYCL
 class seeding_algorithm : public algorithm<seed_collection_types::buffer(
-                              const spacepoint_container_types::const_view&)> {
+                              const spacepoint_collection_types::const_view&)> {
 
     public:
     /// Constructor for the seed finding algorithm
     ///
     /// @param mr is a struct of memory resources (shared or host & device)
+    /// @param copy The copy object to use for copying data between device
+    ///             and host memory blocks
     /// @param queue The SYCL queue to work with
     ///
-    seeding_algorithm(const traccc::memory_resource& mr,
+    seeding_algorithm(const seedfinder_config& finder_config,
+                      const spacepoint_grid_config& grid_config,
+                      const seedfilter_config& filter_config,
+                      const traccc::memory_resource& mr, vecmem::copy& copy,
                       const queue_wrapper& queue);
 
     /// Operator executing the algorithm.
@@ -43,9 +49,8 @@ class seeding_algorithm : public algorithm<seed_collection_types::buffer(
     /// @param spacepoints_view is a view of all spacepoints in the event
     /// @return the buffer of track seeds reconstructed from the spacepoints
     ///
-    seed_collection_types::buffer operator()(
-        const spacepoint_container_types::const_view& spacepoints_view)
-        const override;
+    output_type operator()(const spacepoint_collection_types::const_view&
+                               spacepoints_view) const override;
 
     private:
     /// Sub-algorithm performing the spacepoint binning

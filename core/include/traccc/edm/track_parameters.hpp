@@ -11,7 +11,7 @@
 #include "traccc/definitions/common.hpp"
 #include "traccc/definitions/qualifiers.hpp"
 #include "traccc/definitions/track_parametrization.hpp"
-#include "traccc/utils/unit_vectors.hpp"
+#include "traccc/edm/container.hpp"
 
 // detray include(s).
 #include "detray/tracks/tracks.hpp"

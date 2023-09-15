@@ -1,6 +1,6 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2021-2022 CERN for the benefit of the ACTS project
+# (c) 2021-2023 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
 
@@ -14,17 +14,20 @@ endif()
 
 # Turn on a number of warnings for the "known compilers".
 if( ( "${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU" ) OR
-    ( "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" ) )
+    ( "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" ) OR
+    ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "IntelLLVM" ) )
 
    # Basic flags for all build modes.
    traccc_add_flag( CMAKE_CXX_FLAGS "-Wall" )
    traccc_add_flag( CMAKE_CXX_FLAGS "-Wextra" )
    traccc_add_flag( CMAKE_CXX_FLAGS "-Wshadow" )
    traccc_add_flag( CMAKE_CXX_FLAGS "-Wunused-local-typedefs" )
+   traccc_add_flag( CMAKE_CXX_FLAGS "-pedantic" )
 
-   # More rigorous tests for the Debug builds.
-   traccc_add_flag( CMAKE_CXX_FLAGS_DEBUG "-Werror" )
-   traccc_add_flag( CMAKE_CXX_FLAGS_DEBUG "-pedantic" )
+   # Fail on warnings, if asked for that behaviour.
+   if( TRACCC_FAIL_ON_WARNINGS )
+      traccc_add_flag( CMAKE_CXX_FLAGS "-Werror" )
+   endif()
 
 elseif( "${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC" )
 
@@ -33,7 +36,9 @@ elseif( "${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC" )
       "${CMAKE_CXX_FLAGS}" )
    traccc_add_flag( CMAKE_CXX_FLAGS "/W4" )
 
-   # More rigorous tests for the Debug builds.
-   traccc_add_flag( CMAKE_CXX_FLAGS_DEBUG "/WX" )
+   # Fail on warnings, if asked for that behaviour.
+   if( TRACCC_FAIL_ON_WARNINGS )
+      traccc_add_flag( CMAKE_CXX_FLAGS "/WX" )
+   endif()
 
 endif()

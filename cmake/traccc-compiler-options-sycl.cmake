@@ -1,11 +1,17 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2021-2022 CERN for the benefit of the ACTS project
+# (c) 2021-2023 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
 
 # Include the helper function(s).
 include( traccc-functions )
+
+# Only tweak the flags for the Intel compiler.
+if( NOT ( ( "${CMAKE_SYCL_COMPILER_ID}" STREQUAL "IntelLLVM" ) OR
+          ( "${CMAKE_SYCL_COMPILER_ID}" MATCHES "Clang" ) ) )
+   return()
+endif()
 
 # Basic flags for all build modes.
 foreach( mode RELEASE RELWITHDEBINFO MINSIZEREL DEBUG )
@@ -16,10 +22,17 @@ foreach( mode RELEASE RELWITHDEBINFO MINSIZEREL DEBUG )
    traccc_add_flag( CMAKE_SYCL_FLAGS_${mode} "-Wunused-local-typedefs" )
 endforeach()
 
-# More rigorous tests for the Debug builds.
-traccc_add_flag( CMAKE_SYCL_FLAGS_DEBUG "-Werror" )
 if( NOT WIN32 )
-   traccc_add_flag( CMAKE_SYCL_FLAGS_DEBUG "-pedantic" )
+   foreach( mode RELEASE RELWITHDEBINFO MINSIZEREL DEBUG )
+      traccc_add_flag( CMAKE_SYCL_FLAGS_${mode} "-pedantic" )
+   endforeach()
+endif()
+
+# Fail on warnings, if asked for that behaviour.
+if( TRACCC_FAIL_ON_WARNINGS )
+   foreach( mode RELEASE RELWITHDEBINFO MINSIZEREL DEBUG )
+      traccc_add_flag( CMAKE_SYCL_FLAGS_${mode} "-Werror" )
+   endforeach()
 endif()
 
 # Avoid issues coming from MSVC<->DPC++ argument differences.

@@ -15,19 +15,16 @@
 namespace {
 traccc::cuda::component_connection cc;
 
-cca_function_t f = [](const traccc::cell_container_types::host &data) {
+cca_function_t f = [](const traccc::cell_collection_types::host& cells,
+                      const traccc::cell_module_collection_types::host&
+                          modules) {
     std::map<traccc::geometry_id, vecmem::vector<traccc::measurement>> result;
 
-    traccc::measurement_container_types::host mss = cc(data);
+    auto measurements = cc(cells);
 
-    for (std::size_t i = 0; i < mss.size(); ++i) {
-        vecmem::vector<traccc::measurement> msv;
-
-        for (std::size_t j = 0; j < mss.at(i).items.size(); ++j) {
-            msv.push_back(mss.at(i).items.at(j));
-        }
-
-        result.emplace(mss.at(i).header.module, std::move(msv));
+    for (std::size_t i = 0; i < measurements.size(); i++) {
+        result[modules.at(measurements.at(i).module_link).module].push_back(
+            measurements.at(i));
     }
 
     return result;

@@ -1,6 +1,6 @@
 /** TRACCC library, part of the ACTS project (R&D line)
  *
- * (c) 2021-2022 CERN for the benefit of the ACTS project
+ * (c) 2021-2023 CERN for the benefit of the ACTS project
  *
  * Mozilla Public License Version 2.0
  */
@@ -8,6 +8,8 @@
 #pragma once
 
 // Project include(s)
+#include "traccc/cuda/utils/stream.hpp"
+#include "traccc/edm/cell.hpp"
 #include "traccc/edm/seed.hpp"
 #include "traccc/edm/spacepoint.hpp"
 #include "traccc/edm/track_parameters.hpp"
@@ -21,32 +23,57 @@ namespace traccc {
 namespace cuda {
 
 /// track parameter estimation for cuda
+///
+/// This algorithm returns a buffer which is not necessarily filled yet. A
+/// synchronisation statement is required before destroying this buffer.
+///
 struct track_params_estimation
-    : public algorithm<bound_track_parameters_collection_types::host(
-          const spacepoint_container_types::const_view&,
-          const seed_collection_types::const_view&)> {
+    : public algorithm<bound_track_parameters_collection_types::buffer(
+          const spacepoint_collection_types::const_view&,
+          const seed_collection_types::const_view&,
+          const cell_module_collection_types::const_view&, const vector3&,
+          const std::array<traccc::scalar, traccc::e_bound_size>&)> {
 
     public:
     /// Constructor for track_params_estimation
     ///
     /// @param mr is the memory resource
-    track_params_estimation(const traccc::memory_resource& mr);
+    /// @param copy The copy object to use for copying data between device
+    ///             and host memory blocks
+    /// @param str The CUDA stream to perform the operations in
+    track_params_estimation(const traccc::memory_resource& mr,
+                            vecmem::copy& copy, stream& str);
 
     /// Callable operator for track_params_esitmation
     ///
-    /// @param spaepoints_view   is the view of the spacepoint container
-    /// @param seeds_view        is the view of the seed container
-    /// @return                  vector of bound track parameters
+    /// @param spacepoints All spacepoints of the event
+    /// @param seeds The reconstructed track seeds of the event
+    /// @param modules Geometry module vector
+    /// @param bfield (Temporary) Magnetic field vector
+    /// @param stddev standard deviation for setting the covariance (Default
+    /// value from arXiv:2112.09470v1)
+    /// @return A vector of bound track parameters
     ///
-    bound_track_parameters_collection_types::host operator()(
-        const spacepoint_container_types::const_view& spacepoints_view,
-        const seed_collection_types::const_view& seeds_view) const override;
+    output_type operator()(
+        const spacepoint_collection_types::const_view& spacepoints_view,
+        const seed_collection_types::const_view& seeds_view,
+        const cell_module_collection_types::const_view& modules_view,
+        const vector3& bfield,
+        const std::array<traccc::scalar, traccc::e_bound_size>& = {
+            0.02 * detray::unit<traccc::scalar>::mm,
+            0.03 * detray::unit<traccc::scalar>::mm,
+            1. * detray::unit<traccc::scalar>::degree,
+            1. * detray::unit<traccc::scalar>::degree,
+            0.01 / detray::unit<traccc::scalar>::GeV,
+            1 * detray::unit<traccc::scalar>::ns}) const override;
 
     private:
     /// Memory resource used by the algorithm
     traccc::memory_resource m_mr;
-    /// Copy object used by the algorithm
-    std::unique_ptr<vecmem::copy> m_copy;
+    /// The copy object to use
+    vecmem::copy& m_copy;
+    /// The CUDA stream to use
+    stream& m_stream;
 };
 
 }  // namespace cuda

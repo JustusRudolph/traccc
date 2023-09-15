@@ -8,15 +8,15 @@
 #pragma once
 
 #include "traccc/edm/cell.hpp"
-#include "traccc/edm/measurement.hpp"
 #include "traccc/edm/spacepoint.hpp"
+#include "traccc/io/reader_edm.hpp"
 
 namespace traccc {
 struct result {
-    measurement_container_types::host measurements;
-    spacepoint_container_types::host spacepoints;
+    measurement_collection_types::host measurements;
+    spacepoint_collection_types::host spacepoints;
 };
 
-using demonstrator_input = vecmem::vector<cell_container_types::host>;
+using demonstrator_input = vecmem::vector<io::cell_reader_output>;
 using demonstrator_result = vecmem::vector<result>;
 }  // namespace traccc

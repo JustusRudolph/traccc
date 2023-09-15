@@ -1,8 +1,11 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2021-2022 CERN for the benefit of the ACTS project
+# (c) 2021-2023 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
+
+# Project include(s).
+include( traccc-compiler-options-cpp )
 
 # Set up the "build" of the traccc::core library.
 traccc_add_library( traccc_core core TYPE SHARED
@@ -23,6 +26,8 @@ traccc_add_library( traccc_core core TYPE SHARED
   "include/traccc/edm/container.hpp"
   "include/traccc/edm/internal_spacepoint.hpp"
   "include/traccc/edm/seed.hpp"
+  "include/traccc/edm/track_candidate.hpp"
+  "include/traccc/edm/track_state.hpp"
   "include/traccc/edm/cell.hpp"
   # Geometry description.
   "include/traccc/geometry/module_map.hpp"
@@ -30,9 +35,10 @@ traccc_add_library( traccc_core core TYPE SHARED
   "include/traccc/geometry/pixel_data.hpp"
   # Utilities.
   "include/traccc/utils/algorithm.hpp"
+  "include/traccc/utils/compare.hpp"
   "include/traccc/utils/type_traits.hpp"
-  "include/traccc/utils/unit_vectors.hpp"
   "include/traccc/utils/memory_resource.hpp"
+  "include/traccc/utils/seed_generator.hpp"
   # Clusterization algorithmic code.
   "include/traccc/clusterization/detail/measurement_creation_helper.hpp"
   "include/traccc/clusterization/detail/sparse_ccl.hpp"
@@ -44,6 +50,18 @@ traccc_add_library( traccc_core core TYPE SHARED
   "src/clusterization/spacepoint_formation.cpp"
   "include/traccc/clusterization/measurement_creation.hpp"
   "src/clusterization/measurement_creation.cpp"
+  # Finding algorithmic code
+  "include/traccc/finding/candidate_link.hpp"
+  "include/traccc/finding/finding_algorithm.hpp"
+  "include/traccc/finding/finding_config.hpp"
+  "include/traccc/finding/interaction_register.hpp"
+  # Fitting algorithmic code
+  "include/traccc/fitting/kalman_filter/gain_matrix_smoother.hpp"
+  "include/traccc/fitting/kalman_filter/gain_matrix_updater.hpp"
+  "include/traccc/fitting/kalman_filter/kalman_actor.hpp"
+  "include/traccc/fitting/kalman_filter/kalman_fitter.hpp"
+  "include/traccc/fitting/kalman_filter/statistics_updater.hpp"
+  "include/traccc/fitting/fitting_algorithm.hpp"
   # Seed finding algorithmic code.
   "include/traccc/seeding/detail/lin_circle.hpp"
   "include/traccc/seeding/detail/doublet.hpp"
@@ -69,5 +87,10 @@ traccc_add_library( traccc_core core TYPE SHARED
   "include/traccc/seeding/spacepoint_binning.hpp"
   "src/seeding/spacepoint_binning.cpp" )
 target_link_libraries( traccc_core
-  PUBLIC Eigen3::Eigen vecmem::core detray::core ActsCore ActsPluginJson
-         traccc::Thrust traccc::algebra )
+  PUBLIC Eigen3::Eigen vecmem::core detray::core traccc::Thrust
+         traccc::algebra )
+
+# Prevent Eigen from getting confused when building code for a
+# CUDA or HIP backend with SYCL.
+target_compile_definitions( traccc_core
+  PUBLIC $<$<COMPILE_LANGUAGE:SYCL>:EIGEN_NO_CUDA EIGEN_NO_HIP> )

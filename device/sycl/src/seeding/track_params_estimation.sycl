@@ -25,38 +25,29 @@ class estimate_track_params;
 }  // namespace kernels
 
 track_params_estimation::track_params_estimation(
-    const traccc::memory_resource& mr, queue_wrapper queue)
-    : m_mr(mr), m_queue(queue) {
+    const traccc::memory_resource& mr, vecmem::copy& copy, queue_wrapper queue)
+    : m_mr(mr), m_queue(queue), m_copy(copy) {}
 
-    // Initialize m_copy ptr based on memory resources that were given
-    if (mr.host) {
-        m_copy = std::make_unique<vecmem::sycl::copy>(queue.queue());
-    } else {
-        m_copy = std::make_unique<vecmem::copy>();
-    }
-}
-
-bound_track_parameters_collection_types::host
-track_params_estimation::operator()(
-    const spacepoint_container_types::const_view& spacepoints_view,
-    const seed_collection_types::const_view& seeds_view) const {
+track_params_estimation::output_type track_params_estimation::operator()(
+    const spacepoint_collection_types::const_view& spacepoints_view,
+    const seed_collection_types::const_view& seeds_view,
+    const cell_module_collection_types::const_view& modules_view,
+    const vector3& bfield,
+    const std::array<traccc::scalar, traccc::e_bound_size>& stddev) const {
 
     // Get the size of the seeds view
-    auto seeds_size = m_copy->get_size(seeds_view);
-
-    // Create output host container
-    bound_track_parameters_collection_types::host params(
-        seeds_size, (m_mr.host ? m_mr.host : &(m_mr.main)));
-
-    // Check if anything needs to be done.
-    if (seeds_size == 0) {
-        return params;
-    }
+    auto seeds_size = m_copy.get_size(seeds_view);
 
     // Create device buffer for the parameters
     bound_track_parameters_collection_types::buffer params_buffer(seeds_size,
                                                                   m_mr.main);
-    m_copy->setup(params_buffer);
+    m_copy.setup(params_buffer)->wait();
+
+    // Check if anything needs to be done.
+    if (seeds_size == 0) {
+        return params_buffer;
+    }
+
     bound_track_parameters_collection_types::view params_view(params_buffer);
 
     // -- localSize
@@ -71,19 +62,17 @@ track_params_estimation::operator()(
     details::get_queue(m_queue)
         .submit([&](::sycl::handler& h) {
             h.parallel_for<kernels::estimate_track_params>(
-                trackParamsNdRange, [spacepoints_view, seeds_view,
-                                     params_view](::sycl::nd_item<1> item) {
-                    device::estimate_track_params(item.get_global_linear_id(),
-                                                  spacepoints_view, seeds_view,
-                                                  params_view);
+                trackParamsNdRange,
+                [spacepoints_view, seeds_view, modules_view, bfield, stddev,
+                 params_view](::sycl::nd_item<1> item) {
+                    device::estimate_track_params(
+                        item.get_global_linear_id(), spacepoints_view,
+                        seeds_view, modules_view, bfield, stddev, params_view);
                 });
         })
         .wait_and_throw();
 
-    // Copy the results back to the host
-    (*m_copy)(params_buffer, params);
-
-    return params;
+    return params_buffer;
 }
 
 }  // namespace traccc::sycl

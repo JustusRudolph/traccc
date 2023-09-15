@@ -29,7 +29,7 @@ namespace traccc::sycl {
 
 // Sycl seeding function object
 class seed_finding : public algorithm<seed_collection_types::buffer(
-                         const spacepoint_container_types::const_view&,
+                         const spacepoint_collection_types::const_view&,
                          const sp_grid_const_view&)> {
 
     public:
@@ -39,11 +39,14 @@ class seed_finding : public algorithm<seed_collection_types::buffer(
     /// @param filter_config is seed filter configuration parameters
     /// @param mr       is a struct of memory resources (shared or
     /// host & device)
+    /// @param copy The copy object to use for copying data between device
+    ///             and host memory blocks
     /// @param queue    is a wrapper for the sycl queue for kernel
     /// invocation
     seed_finding(const seedfinder_config& config,
                  const seedfilter_config& filter_config,
-                 const traccc::memory_resource& mr, queue_wrapper queue);
+                 const traccc::memory_resource& mr, vecmem::copy& copy,
+                 queue_wrapper queue);
 
     /// Callable operator for the seed finding
     ///
@@ -51,8 +54,8 @@ class seed_finding : public algorithm<seed_collection_types::buffer(
     /// @param g2_view              is a view of the spacepoint grid
     /// @return                     a vector buffer of seeds
     ///
-    seed_collection_types::buffer operator()(
-        const spacepoint_container_types::const_view& spacepoints_view,
+    output_type operator()(
+        const spacepoint_collection_types::const_view& spacepoints_view,
         const sp_grid_const_view& g2_view) const override;
 
     private:
@@ -61,7 +64,7 @@ class seed_finding : public algorithm<seed_collection_types::buffer(
     seedfilter_config m_seedfilter_config;
     traccc::memory_resource m_mr;
     mutable queue_wrapper m_queue;
-    std::unique_ptr<vecmem::copy> m_copy;
+    vecmem::copy& m_copy;
 };
 
 }  // namespace traccc::sycl

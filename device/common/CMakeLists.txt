@@ -1,6 +1,6 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2022 CERN for the benefit of the ACTS project
+# (c) 2022-2023 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
 
@@ -20,19 +20,19 @@ traccc_add_library( traccc_device_common device_common TYPE SHARED
    "include/traccc/device/container_d2h_copy_alg.hpp"
    "include/traccc/device/impl/container_d2h_copy_alg.ipp"
    # EDM class(es).
+   "include/traccc/edm/device/finding_global_counter.hpp"
+   "include/traccc/edm/device/seeding_global_counter.hpp"
    "include/traccc/edm/device/doublet_counter.hpp"
    "include/traccc/edm/device/triplet_counter.hpp"
+   "include/traccc/edm/device/device_doublet.hpp"
+   "include/traccc/edm/device/device_triplet.hpp"
    # Clusterization function(s).
-   "include/traccc/clusterization/device/find_clusters.hpp"
-   "include/traccc/clusterization/device/impl/find_clusters.ipp"
-   "include/traccc/clusterization/device/count_cluster_cells.hpp"
-   "include/traccc/clusterization/device/impl/count_cluster_cells.ipp"
-   "include/traccc/clusterization/device/connect_components.hpp"
-   "include/traccc/clusterization/device/impl/connect_components.ipp"
-   "include/traccc/clusterization/device/create_measurements.hpp"
-   "include/traccc/clusterization/device/impl/create_measurements.ipp"
    "include/traccc/clusterization/device/form_spacepoints.hpp"
    "include/traccc/clusterization/device/impl/form_spacepoints.ipp"
+   "include/traccc/clusterization/device/reduce_problem_cell.hpp"
+   "include/traccc/clusterization/device/impl/reduce_problem_cell.ipp"
+   "include/traccc/clusterization/device/aggregate_cluster.hpp"
+   "include/traccc/clusterization/device/impl/aggregate_cluster.ipp"
    # Spacepoint binning function(s).
    "include/traccc/seeding/device/count_grid_capacities.hpp"
    "include/traccc/seeding/device/impl/count_grid_capacities.ipp"
@@ -43,24 +43,37 @@ traccc_add_library( traccc_device_common device_common TYPE SHARED
    "include/traccc/seeding/device/impl/count_doublets.ipp"
    "include/traccc/seeding/device/find_doublets.hpp"
    "include/traccc/seeding/device/impl/find_doublets.ipp"
-   "include/traccc/seeding/device/make_doublet_counter_buffer.hpp"
-   "src/seeding/make_doublet_counter_buffer.cpp"
-   "include/traccc/seeding/device/make_doublet_buffers.hpp"
-   "src/seeding/make_doublet_buffers.cpp"
    "include/traccc/seeding/device/count_triplets.hpp"
    "include/traccc/seeding/device/impl/count_triplets.ipp"
+   "include/traccc/seeding/device/reduce_triplet_counts.hpp"
+   "include/traccc/seeding/device/impl/reduce_triplet_counts.ipp"
    "include/traccc/seeding/device/find_triplets.hpp"
    "include/traccc/seeding/device/impl/find_triplets.ipp"
-   "include/traccc/seeding/device/make_triplet_counter_buffer.hpp"
-   "src/seeding/make_triplet_counter_buffer.cpp"
-   "include/traccc/seeding/device/make_triplet_buffer.hpp"
-   "src/seeding/make_triplet_buffer.cpp"
    "include/traccc/seeding/device/update_triplet_weights.hpp"
    "include/traccc/seeding/device/impl/update_triplet_weights.ipp"
    "include/traccc/seeding/device/select_seeds.hpp"
    "include/traccc/seeding/device/impl/select_seeds.ipp"
    # Track parameters estimation function(s).
    "include/traccc/seeding/device/estimate_track_params.hpp"
-   "include/traccc/seeding/device/impl/estimate_track_params.ipp" )
+   "include/traccc/seeding/device/impl/estimate_track_params.ipp"
+   # Track finding funtions(s).
+   "include/traccc/finding/device/apply_interaction.hpp"
+   "include/traccc/finding/device/build_tracks.hpp"
+   "include/traccc/finding/device/count_measurements.hpp"
+   "include/traccc/finding/device/count_threads.hpp"
+   "include/traccc/finding/device/find_tracks.hpp"
+   "include/traccc/finding/device/make_module_map.hpp"
+   "include/traccc/finding/device/propagate_to_next_surface.hpp"
+   "include/traccc/finding/device/impl/apply_interaction.ipp"
+   "include/traccc/finding/device/impl/build_tracks.ipp"
+   "include/traccc/finding/device/impl/count_measurements.ipp"
+   "include/traccc/finding/device/impl/count_threads.ipp"
+   "include/traccc/finding/device/impl/find_tracks.ipp"
+   "include/traccc/finding/device/impl/make_module_map.ipp"
+   "include/traccc/finding/device/impl/propagate_to_next_surface.ipp"
+   # Track fitting funtions(s).
+   "include/traccc/fitting/device/fit.hpp"
+   "include/traccc/fitting/device/impl/fit.ipp"
+   )
 target_link_libraries( traccc_device_common
    PUBLIC traccc::Thrust traccc::core vecmem::core )

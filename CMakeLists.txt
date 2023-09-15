@@ -1,12 +1,12 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2021-2022 CERN for the benefit of the ACTS project
+# (c) 2021-2023 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
 
 # Set up the project.
 cmake_minimum_required( VERSION 3.9 )
-project( traccc VERSION 0.2.0 LANGUAGES CXX )
+project( traccc VERSION 0.6.0 LANGUAGES CXX )
 
 # Set up the used C++ standard(s).
 set( CMAKE_CXX_STANDARD 17 CACHE STRING "The (host) C++ standard to use" )
@@ -14,6 +14,10 @@ set( CMAKE_CXX_EXTENSIONS FALSE CACHE BOOL "Disable (host) C++ extensions" )
 set( CMAKE_CUDA_STANDARD 17 CACHE STRING "The (CUDA) C++ standard to use" )
 set( CMAKE_CUDA_EXTENSIONS FALSE CACHE BOOL "Disable (CUDA) C++ extensions" )
 set( CMAKE_SYCL_STANDARD 17 CACHE STRING "The (SYCL) C++ standard to use" )
+
+# Flag controlling whether warnings should make the build fail.
+option( TRACCC_FAIL_ON_WARNINGS
+   "Make the build fail on compiler/linker warnings" FALSE )
 
 # Standard CMake include(s).
 include( GNUInstallDirs )
@@ -51,11 +55,14 @@ option( TRACCC_BUILD_FUTHARK "Build the Futhark sources included in traccc"
    FALSE )
 option( TRACCC_BUILD_KOKKOS "Build the Kokkos sources included in traccc"
    FALSE )
+option( TRACCC_BUILD_ALPAKA "Build the Alpaka sources included in traccc"
+   FALSE )
 option( TRACCC_BUILD_TESTING "Build the (unit) tests of traccc" TRUE )
 option( TRACCC_BUILD_EXAMPLES "Build the examples of traccc" TRUE )
 
-# Flags controlling the meta-build system.
+# Flags controlling what traccc should use.
 option( TRACCC_USE_SYSTEM_LIBS "Use system libraries be default" FALSE )
+option( TRACCC_USE_ROOT "Use ROOT in the build (if needed)" TRUE )
 
 # Clean up.
 unset( TRACCC_BUILD_CUDA_DEFAULT )
@@ -109,10 +116,31 @@ set( TRACCC_THRUST_OPTIONS "" CACHE STRING
    "Extra options for configuring how Thrust should be used" )
 mark_as_advanced( TRACCC_THRUST_OPTIONS )
 thrust_create_target( traccc::Thrust ${TRACCC_THRUST_OPTIONS} )
+# Make sure that Thrust/CUB headers are treated as system headers.
+get_target_property( _thrustIncludeDir Thrust::Thrust INTERFACE_INCLUDE_DIRECTORIES )
+get_target_property( _cubIncludeDir CUB::CUB INTERFACE_INCLUDE_DIRECTORIES )
+target_include_directories( traccc::Thrust
+   SYSTEM INTERFACE ${_thrustIncludeDir} ${_cubIncludeDir} )
+unset( _thrustIncludeDir )
+unset( _cubIncludeDir )
+
+# Set up TBB.
+option( TRACCC_SETUP_TBB
+   "Set up the TBB target(s) explicitly" TRUE )
+option( TRACCC_USE_SYSTEM_TBB
+   "Pick up an existing installation of TBB from the build environment"
+   ${TRACCC_USE_SYSTEM_LIBS} )
+if( TRACCC_SETUP_TBB )
+   if( TRACCC_USE_SYSTEM_TBB )
+      find_package( TBB REQUIRED )
+   else()
+      add_subdirectory( extern/tbb )
+   endif()
+endif()
 
 # Set up Kokkos.
 option( TRACCC_SETUP_KOKKOS
-   "Set up the Kokkos library" TRUE )
+   "Set up the Kokkos library" ${TRACCC_BUILD_KOKKOS} )
 option( TRACCC_USE_SYSTEM_KOKKOS
    "Pick up an existing installation of Kokkos from the build environment"
    ${TRACCC_USE_SYSTEM_LIBS} )
@@ -121,6 +149,20 @@ if( TRACCC_SETUP_KOKKOS )
       find_package( Kokkos REQUIRED )
    else()
       add_subdirectory( extern/kokkos )
+   endif()
+endif()
+
+# Set up Alpaka.
+option( TRACCC_SETUP_ALPAKA
+   "Set up the Alpaka library" ${TRACCC_BUILD_ALPAKA})
+option( TRACCC_USE_SYSTEM_ALPAKA
+   "Pick up an existing installation of Alpaka from the build environment"
+   ${TRACCC_USE_SYSTEM_LIBS} )
+if( TRACCC_SETUP_ALPAKA )
+   if( TRACCC_USE_SYSTEM_ALPAKA )
+      find_package( alpaka REQUIRED )
+   else()
+      add_subdirectory( extern/alpaka )
    endif()
 endif()
 
@@ -135,6 +177,20 @@ if( TRACCC_SETUP_ALGEBRA_PLUGINS )
       find_package( algebra-plugins REQUIRED )
    else()
       add_subdirectory( extern/algebra-plugins )
+   endif()
+endif()
+
+# Set up covfie.
+option( TRACCC_SETUP_COVFIE
+   "Set up the covfie target(s) explicitly" TRUE )
+option( TRACCC_USE_SYSTEM_COVFIE
+   "Pick up an existing installation of covfie from the build environment"
+   ${TRACCC_USE_SYSTEM_LIBS} )
+if( TRACCC_SETUP_COVFIE )
+   if( TRACCC_USE_SYSTEM_COVFIE )
+      find_package( covfie REQUIRED )
+   else()
+      add_subdirectory( extern/covfie )
    endif()
 endif()
 
@@ -181,8 +237,12 @@ if( TRACCC_SETUP_ACTS )
 endif()
 
 # Set up GoogleTest.
+include( CTest )
+if (BUILD_TESTING AND TRACCC_BUILD_TESTING)
+set (TRACCC_DEFAULT_SETUP_GOOGLETEST TRUE)
+endif ()
 option( TRACCC_SETUP_GOOGLETEST
-   "Set up the GoogleTest target(s) explicitly" TRUE )
+   "Set up the GoogleTest target(s) explicitly" ${TRACCC_DEFAULT_SETUP_GOOGLETEST} )
 option( TRACCC_USE_SYSTEM_GOOGLETEST
    "Pick up an existing installation of GoogleTest from the build environment"
    ${TRACCC_USE_SYSTEM_LIBS} )
@@ -193,6 +253,9 @@ if( TRACCC_SETUP_GOOGLETEST )
       add_subdirectory( extern/googletest )
    endif()
 endif()
+
+option( TRACCC_ENABLE_NVTX_PROFILING
+        "Use instrument functions to enable fine grained profiling" FALSE )
 
 # option for algebra plugins (ARRAY EIGEN SMATRIX VC VECMEM)
 set(TRACCC_ALGEBRA_PLUGINS ARRAY CACHE STRING "Algebra plugin to use in the build")
@@ -205,22 +268,27 @@ add_subdirectory( device/common )
 if( TRACCC_BUILD_CUDA )
    add_subdirectory( device/cuda )
 endif()
+if( TRACCC_BUILD_KOKKOS )
+   add_subdirectory( device/kokkos )
+endif()
 if( TRACCC_BUILD_SYCL )
    add_subdirectory( device/sycl )
 endif()
+if( TRACCC_BUILD_ALPAKA )
+   add_subdirectory( device/alpaka )
+endif()
 add_subdirectory( io )
+add_subdirectory( performance )
 add_subdirectory( plugins )
 
 if ( TRACCC_BUILD_EXAMPLES )
    # Find Boost.
-   find_package( Boost REQUIRED COMPONENTS program_options)
-   # Find ROOT.
-   find_package( ROOT COMPONENTS RIO Tree Hist )
+   find_package( Boost REQUIRED COMPONENTS program_options filesystem)
+
    add_subdirectory( examples )
 endif()
 
 # Set up the test(s).
-include( CTest )
 if( BUILD_TESTING AND TRACCC_BUILD_TESTING )
    add_subdirectory( tests )
 endif()
@@ -228,3 +296,6 @@ endif()
 if(TRACCC_BUILD_FUTHARK)
    add_subdirectory(device/futhark)
 endif()
+
+# Set up the packaging of the project.
+include( traccc-packaging )
